@@ -69,6 +69,8 @@ public class MainActivity extends Activity {
     /** 各机型最近一次读到的原始镜像 */
     private byte[] imageKt = new byte[EepromImage.SIZE];
     private byte[] imageK5 = new byte[Uvk5Radio.EEPROM_SIZE];
+    private boolean ktLoaded = false;
+    private boolean k5Loaded = false;
 
     private ChannelAdapter channelAdapter;
     private final ExecutorService io = Executors.newSingleThreadExecutor();
@@ -340,8 +342,17 @@ public class MainActivity extends Activity {
     }
 
     void setImage(byte[] img) {
-        if (machine == RadioType.KT10R) imageKt = img;
-        else imageK5 = img;
+        if (machine == RadioType.KT10R) {
+            imageKt = img;
+            ktLoaded = true;
+        } else {
+            imageK5 = img;
+            k5Loaded = true;
+        }
+    }
+
+    boolean isImageLoaded() {
+        return machine == RadioType.KT10R ? ktLoaded : k5Loaded;
     }
 
     TextView getTvStatus() {
@@ -817,6 +828,19 @@ public class MainActivity extends Activity {
         @Override
         public void run() {
             try {
+                // 若当前机型尚未读频，先读取原机数据，避免把空白镜像写入电台
+                if (!act.isImageLoaded()) {
+                    act.log("当前机型尚未读取，先读取原机数据以保留设置...");
+                    if (act.getMachine() == RadioType.KT10R) {
+                        act.getKtLink().handshake();
+                        EepromImage img = new EepromImage();
+                        act.getKtLink().readAll(img, "");
+                        act.setImage(img.data);
+                    } else {
+                        act.getK5Radio().init();
+                        act.setImage(act.getK5Radio().readAll());
+                    }
+                }
                 if (act.getMachine() == RadioType.KT10R) {
                     byte[] img = act.getImage().clone();
                     Kt10rCodec.applyChannels(img, act.getChannels());
