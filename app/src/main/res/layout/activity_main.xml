@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="#FFFFFFFF">
+
+    <!-- 标题栏 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@color/headerBg"
+        android:paddingTop="14dp"
+        android:paddingBottom="12dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp">
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="写频助手"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFFFF" />
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="KT-10R / UV-K5 双机型 · OTG 串口写频"
+            android:textSize="12sp"
+            android:textColor="#FFBBDEFB" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="10dp">
+
+        <!-- 机型选择 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="写频机型"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:textColor="@color/headerBg"
+            android:paddingBottom="2dp" />
+        <Spinner
+            android:id="@+id/spinnerMachine"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:minHeight="44dp"
+            android:background="@color/panelBg" />
+
+        <!-- UV-K5 专属信息面板 -->
+        <LinearLayout
+            android:id="@+id/panelUvk5"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@color/panelBg"
+            android:padding="8dp"
+            android:layout_marginTop="6dp"
+            android:visibility="gone">
+            <TextView
+                android:id="@+id/tvUvk5Info"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="UV-K5 特性：宽频接收 / AM·USB·LSB 调制 / 扰频 / 200 频道 / 10 字符信道名"
+                android:textSize="11sp"
+                android:textColor="@color/headerBg2" />
+        </LinearLayout>
+
+        <!-- 串口 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="8dp">
+            <Spinner
+                android:id="@+id/spinnerDevices"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:minHeight="44dp" />
+            <Button
+                android:id="@+id/btnConnect"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:text="@string/connect"
+                android:textSize="14sp"
+                android:textColor="#FFFFFFFF"
+                android:background="@color/btnBlue"
+                android:layout_marginStart="8dp" />
+        </LinearLayout>
+
+        <!-- 操作 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp">
+            <Button
+                android:id="@+id/btnRead"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:text="@string/read_radio"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFFFF"
+                android:background="@color/btnBlueDark"
+                android:layout_marginEnd="4dp" />
+            <Button
+                android:id="@+id/btnWrite"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:text="@string/write_radio"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFFFF"
+                android:background="@color/btnRed"
+                android:layout_marginStart="4dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="6dp">
+            <Button
+                android:id="@+id/btnSave"
+                android:layout_width="0dp"
+                android:layout_height="42dp"
+                android:layout_weight="1"
+                android:text="@string/save_image"
+                android:textSize="12sp"
+                android:background="@color/btnGray"
+                android:textColor="#FFFFFFFF"
+                android:layout_marginEnd="3dp" />
+            <Button
+                android:id="@+id/btnOpen"
+                android:layout_width="0dp"
+                android:layout_height="42dp"
+                android:layout_weight="1"
+                android:text="@string/open_image"
+                android:textSize="12sp"
+                android:background="@color/btnGray"
+                android:textColor="#FFFFFFFF"
+                android:layout_marginStart="3dp"
+                android:layout_marginEnd="3dp" />
+            <Button
+                android:id="@+id/btnHex"
+                android:layout_width="0dp"
+                android:layout_height="42dp"
+                android:layout_weight="1"
+                android:text="@string/hex_view"
+                android:textSize="12sp"
+                android:background="@color/btnGray"
+                android:textColor="#FFFFFFFF"
+                android:layout_marginStart="3dp" />
+        </LinearLayout>
+
+        <ProgressBar
+            android:id="@+id/progress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:max="100" />
+
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="未连接"
+            android:textSize="14sp"
+            android:textColor="@color/textDark"
+            android:paddingTop="4dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="频道数据（点击编辑）"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="@color/headerBg"
+            android:paddingTop="8dp"
+            android:paddingBottom="4dp" />
+
+        <ListView
+            android:id="@+id/listChannels"
+            android:layout_width="match_parent"
+            android:layout_height="290dp"
+            android:background="@color/panelBg2"
+            android:divider="#FFBBDEFB"
+            android:dividerHeight="1dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="通讯日志"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="@color/headerBg"
+            android:paddingTop="8dp"
+            android:paddingBottom="4dp" />
+
+        <ScrollView
+            android:id="@+id/scrollLog"
+            android:layout_width="match_parent"
+            android:layout_height="110dp"
+            android:background="@color/logBg">
+            <TextView
+                android:id="@+id/tvLog"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="11sp"
+                android:fontFamily="monospace"
+                android:textColor="@color/logText"
+                android:padding="6dp" />
+        </ScrollView>
+    </LinearLayout>
+</LinearLayout>
+</ScrollView>

@@ -1,0 +1,5 @@
+out/
+*.keystore
+*.apk
+.idea/
+build/

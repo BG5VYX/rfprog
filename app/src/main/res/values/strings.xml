@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">写频助手</string>
+    <string name="connect">连接</string>
+    <string name="disconnect">断开</string>
+    <string name="read_radio">读频</string>
+    <string name="write_radio">写频</string>
+    <string name="save_image">保存镜像</string>
+    <string name="open_image">打开镜像</string>
+    <string name="hex_view">原始数据</string>
+</resources>
