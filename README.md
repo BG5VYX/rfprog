@@ -71,6 +71,18 @@ bash build.sh
 
 ## 更新日志
 
+### v3.0 — 全新科技风 UI
+- **深色科技风界面**：渐变卡片、霓虹蓝高亮、等宽数字，整体重绘
+- **卡片式频道编辑**：卡片顶部显示信道号，下方录入 RX/TX 频率、亚音、频宽、功率、信道名
+- **保存 / 上一个 / 下一个**：保存到本地（JSON），切换信道连续录入
+- **本地频率表**：自动保存与恢复，重启不丢数据
+- **频率表导入 / 导出（CSV）**：Excel 可直接编辑，格式 `ch,rx,tx,rx_tone,tx_tone,bandwidth,power,name,modulation,scramble`
+- **工具菜单**：导入/导出频率表、备份/还原 EEPROM、备份/还原校准（UV-K5）、保存/打开镜像、原始数据
+- **UV-K5 备份体系**（对齐 k5web）：
+  - EEPROM 全量备份/还原（0x0000-0x2000）
+  - 校准数据备份/还原（0x1E00-0x2000，512 字节）
+- 修复若干布局与主题问题
+
 ### v2.1
 - 修复 Android 12+ 的 PendingIntent 崩溃（增加 FLAG_IMMUTABLE）
 - 修复 Android 14 的动态广播注册崩溃（RECEIVER_EXPORTED）

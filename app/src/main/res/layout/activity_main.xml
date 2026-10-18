@@ -2,101 +2,106 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true">
+    android:background="@drawable/bg_screen"
+    android:fillViewport="true"
+    android:scrollbars="none">
 
 <LinearLayout
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:background="#FFFFFFFF">
+    android:orientation="vertical">
 
-    <!-- 标题栏 -->
+    <!-- ================= 顶部标题 ================= -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:background="@color/headerBg"
-        android:paddingTop="14dp"
-        android:paddingBottom="12dp"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp">
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="写频助手"
-            android:textSize="22sp"
-            android:textStyle="bold"
-            android:textColor="#FFFFFFFF" />
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="KT-10R / UV-K5 双机型 · OTG 串口写频"
-            android:textSize="12sp"
-            android:textColor="#FFBBDEFB" />
-    </LinearLayout>
+        android:background="@drawable/bg_header"
+        android:paddingStart="18dp"
+        android:paddingEnd="18dp"
+        android:paddingTop="18dp"
+        android:paddingBottom="16dp">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="10dp">
-
-        <!-- 机型选择 -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="写频机型"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            android:textColor="@color/headerBg"
-            android:paddingBottom="2dp" />
-        <Spinner
-            android:id="@+id/spinnerMachine"
-            android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:minHeight="44dp"
-            android:background="@color/panelBg" />
-
-        <!-- UV-K5 专属信息面板 -->
-        <LinearLayout
-            android:id="@+id/panelUvk5"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:background="@color/panelBg"
-            android:padding="8dp"
-            android:layout_marginTop="6dp"
-            android:visibility="gone">
-            <TextView
-                android:id="@+id/tvUvk5Info"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="UV-K5 特性：宽频接收 / AM·USB·LSB 调制 / 扰频 / 200 频道 / 10 字符信道名"
-                android:textSize="11sp"
-                android:textColor="@color/headerBg2" />
-        </LinearLayout>
-
-        <!-- 串口 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginTop="8dp">
+            android:gravity="center_vertical">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="写频助手"
+                    android:textSize="24sp"
+                    android:textStyle="bold"
+                    android:textColor="#FFFFFFFF"
+                    android:letterSpacing="0.06" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="RADIO PROGRAMMER · OTG"
+                    android:textSize="9sp"
+                    android:textColor="#FF00D4FF"
+                    android:letterSpacing="0.25" />
+            </LinearLayout>
+
+            <Spinner
+                android:id="@+id/spinnerMachine"
+                android:layout_width="wrap_content"
+                android:layout_height="38dp"
+                android:minWidth="150dp"
+                android:background="@drawable/bg_chip"
+                android:paddingStart="10dp"
+                android:paddingEnd="6dp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvMachineInfo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="KT-10R · 9600 8N1 · 未连接"
+            android:textSize="11sp"
+            android:textColor="#FF7A93B8"
+            android:paddingTop="8dp" />
+    </LinearLayout>
+
+    <!-- ================= 内容 ================= -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="14dp">
+
+        <!-- 串口连接 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
             <Spinner
                 android:id="@+id/spinnerDevices"
                 android:layout_width="0dp"
-                android:layout_height="44dp"
+                android:layout_height="42dp"
                 android:layout_weight="1"
-                android:minHeight="44dp" />
+                android:background="@drawable/bg_input"
+                android:paddingStart="10dp"
+                android:paddingEnd="6dp" />
+
             <Button
                 android:id="@+id/btnConnect"
-                android:layout_width="wrap_content"
-                android:layout_height="44dp"
-                android:text="@string/connect"
-                android:textSize="14sp"
+                android:layout_width="92dp"
+                android:layout_height="42dp"
+                android:text="连接"
+                android:textSize="13sp"
+                android:textStyle="bold"
                 android:textColor="#FFFFFFFF"
-                android:background="@color/btnBlue"
+                android:background="@drawable/btn_primary"
                 android:layout_marginStart="8dp" />
         </LinearLayout>
 
@@ -105,128 +110,454 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginTop="8dp">
+            android:layout_marginTop="10dp">
             <Button
                 android:id="@+id/btnRead"
                 android:layout_width="0dp"
-                android:layout_height="48dp"
+                android:layout_height="44dp"
                 android:layout_weight="1"
-                android:text="@string/read_radio"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                android:textColor="#FFFFFFFF"
-                android:background="@color/btnBlueDark"
-                android:layout_marginEnd="4dp" />
+                android:text="读取电台"
+                android:textSize="13sp"
+                android:textColor="#FF00D4FF"
+                android:background="@drawable/btn_ghost"
+                android:layout_marginEnd="5dp" />
             <Button
                 android:id="@+id/btnWrite"
                 android:layout_width="0dp"
-                android:layout_height="48dp"
+                android:layout_height="44dp"
                 android:layout_weight="1"
-                android:text="@string/write_radio"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                android:textColor="#FFFFFFFF"
-                android:background="@color/btnRed"
-                android:layout_marginStart="4dp" />
+                android:text="写入电台"
+                android:textSize="13sp"
+                android:textColor="#FFFF8A80"
+                android:background="@drawable/btn_ghost"
+                android:layout_marginStart="5dp"
+                android:layout_marginEnd="5dp" />
+            <Button
+                android:id="@+id/btnTools"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:text="工具"
+                android:textSize="13sp"
+                android:textColor="#FFB0BEC5"
+                android:background="@drawable/btn_ghost"
+                android:layout_marginStart="5dp" />
         </LinearLayout>
 
+        <!-- ================= 频道卡片 ================= -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginTop="6dp">
-            <Button
-                android:id="@+id/btnSave"
-                android:layout_width="0dp"
-                android:layout_height="42dp"
-                android:layout_weight="1"
-                android:text="@string/save_image"
-                android:textSize="12sp"
-                android:background="@color/btnGray"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:layout_marginTop="14dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="CH"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="#FF00D4FF"
+                    android:letterSpacing="0.1" />
+
+                <TextView
+                    android:id="@+id/tvChannelNo"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="001"
+                    android:textSize="34sp"
+                    android:textStyle="bold"
+                    android:fontFamily="monospace"
+                    android:textColor="#FFFFFFFF"
+                    android:paddingStart="10dp" />
+
+                <TextView
+                    android:id="@+id/tvTotal"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="/ 200"
+                    android:textSize="12sp"
+                    android:textColor="#FF7A93B8" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#FF1E3A5F"
+                android:layout_marginTop="6dp"
+                android:layout_marginBottom="10dp" />
+
+            <!-- RX / TX -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+                <TextView
+                    android:layout_width="52dp"
+                    android:layout_height="wrap_content"
+                    android:text="RX"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:textColor="#FF00D4FF" />
+                <EditText
+                    android:id="@+id/etRx"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_input"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:inputType="numberDecimal"
+                    android:hint="435.12500"
+                    android:textColorHint="#FF3D5A7A"
+                    android:textSize="16sp"
+                    android:textColor="#FFFFFFFF"
+                    android:fontFamily="monospace" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="MHz"
+                    android:textSize="11sp"
+                    android:textColor="#FF7A93B8"
+                    android:layout_marginStart="6dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="8dp">
+                <TextView
+                    android:layout_width="52dp"
+                    android:layout_height="wrap_content"
+                    android:text="TX"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:textColor="#FF2979FF" />
+                <EditText
+                    android:id="@+id/etTx"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_input"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:inputType="numberDecimal"
+                    android:hint="435.12500"
+                    android:textColorHint="#FF3D5A7A"
+                    android:textSize="16sp"
+                    android:textColor="#FFFFFFFF"
+                    android:fontFamily="monospace" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="MHz"
+                    android:textSize="11sp"
+                    android:textColor="#FF7A93B8"
+                    android:layout_marginStart="6dp" />
+            </LinearLayout>
+
+            <!-- 亚音 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="10dp">
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:layout_marginEnd="5dp">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="RX 亚音"
+                        android:textSize="11sp"
+                        android:textColor="#FF7A93B8" />
+                    <Spinner
+                        android:id="@+id/spQt1"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:background="@drawable/bg_input"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="6dp"
+                        android:layout_marginTop="4dp" />
+                </LinearLayout>
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:layout_marginStart="5dp">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="TX 亚音"
+                        android:textSize="11sp"
+                        android:textColor="#FF7A93B8" />
+                    <Spinner
+                        android:id="@+id/spQt2"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:background="@drawable/bg_input"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="6dp"
+                        android:layout_marginTop="4dp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- 频宽 / 功率 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="8dp">
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:layout_marginEnd="5dp">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="频宽"
+                        android:textSize="11sp"
+                        android:textColor="#FF7A93B8" />
+                    <Spinner
+                        android:id="@+id/spBand"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:background="@drawable/bg_input"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="6dp"
+                        android:layout_marginTop="4dp" />
+                </LinearLayout>
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:layout_marginStart="5dp">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="功率"
+                        android:textSize="11sp"
+                        android:textColor="#FF7A93B8" />
+                    <Spinner
+                        android:id="@+id/spPower"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:background="@drawable/bg_input"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="6dp"
+                        android:layout_marginTop="4dp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- UV-K5 专属 -->
+            <LinearLayout
+                android:id="@+id/panelK5Only"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                android:layout_marginTop="8dp">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginEnd="5dp">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="调制方式"
+                            android:textSize="11sp"
+                            android:textColor="#FF7A93B8" />
+                        <Spinner
+                            android:id="@+id/spMod"
+                            android:layout_width="match_parent"
+                            android:layout_height="40dp"
+                            android:background="@drawable/bg_input"
+                            android:paddingStart="10dp"
+                            android:paddingEnd="6dp"
+                            android:layout_marginTop="4dp" />
+                    </LinearLayout>
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginStart="5dp">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="扰频"
+                            android:textSize="11sp"
+                            android:textColor="#FF7A93B8" />
+                        <CheckBox
+                            android:id="@+id/cbScramble"
+                            android:layout_width="match_parent"
+                            android:layout_height="40dp"
+                            android:text="开启"
+                            android:textSize="13sp"
+                            android:textColor="#FFE6F1FF"
+                            android:buttonTint="#FF00D4FF"
+                            android:layout_marginTop="4dp" />
+                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- 信道名 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="信道名称"
+                android:textSize="11sp"
+                android:textColor="#FF7A93B8"
+                android:layout_marginTop="8dp" />
+            <EditText
+                android:id="@+id/etName"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:background="@drawable/bg_input"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:inputType="text"
+                android:maxLength="10"
+                android:hint="最多10字符"
+                android:textColorHint="#FF3D5A7A"
+                android:textSize="14sp"
                 android:textColor="#FFFFFFFF"
-                android:layout_marginEnd="3dp" />
-            <Button
-                android:id="@+id/btnOpen"
-                android:layout_width="0dp"
-                android:layout_height="42dp"
-                android:layout_weight="1"
-                android:text="@string/open_image"
-                android:textSize="12sp"
-                android:background="@color/btnGray"
-                android:textColor="#FFFFFFFF"
-                android:layout_marginStart="3dp"
-                android:layout_marginEnd="3dp" />
-            <Button
-                android:id="@+id/btnHex"
-                android:layout_width="0dp"
-                android:layout_height="42dp"
-                android:layout_weight="1"
-                android:text="@string/hex_view"
-                android:textSize="12sp"
-                android:background="@color/btnGray"
-                android:textColor="#FFFFFFFF"
-                android:layout_marginStart="3dp" />
+                android:layout_marginTop="4dp" />
+
+            <!-- 卡片按钮 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="14dp">
+                <Button
+                    android:id="@+id/btnPrev"
+                    android:layout_width="0dp"
+                    android:layout_height="46dp"
+                    android:layout_weight="1"
+                    android:text="上一个"
+                    android:textSize="13sp"
+                    android:textColor="#FFB0BEC5"
+                    android:background="@drawable/btn_ghost"
+                    android:layout_marginEnd="5dp" />
+                <Button
+                    android:id="@+id/btnSaveCh"
+                    android:layout_width="0dp"
+                    android:layout_height="46dp"
+                    android:layout_weight="1.4"
+                    android:text="保存"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="#FFFFFFFF"
+                    android:background="@drawable/btn_primary"
+                    android:layout_marginStart="5dp"
+                    android:layout_marginEnd="5dp" />
+                <Button
+                    android:id="@+id/btnNext"
+                    android:layout_width="0dp"
+                    android:layout_height="46dp"
+                    android:layout_weight="1"
+                    android:text="下一个"
+                    android:textSize="13sp"
+                    android:textColor="#FFB0BEC5"
+                    android:background="@drawable/btn_ghost"
+                    android:layout_marginStart="5dp" />
+            </LinearLayout>
         </LinearLayout>
+
+        <!-- 状态 -->
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="未连接"
+            android:textSize="12sp"
+            android:textColor="#FF8FD8FF"
+            android:paddingTop="10dp" />
 
         <ProgressBar
             android:id="@+id/progress"
             style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:max="100" />
+            android:layout_marginTop="4dp"
+            android:max="100"
+            android:progressTint="#FF00D4FF"
+            android:progressBackgroundTint="#FF16283F" />
 
-        <TextView
-            android:id="@+id/tvStatus"
+        <!-- 日志 -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="未连接"
-            android:textSize="14sp"
-            android:textColor="@color/textDark"
-            android:paddingTop="4dp" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="频道数据（点击编辑）"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:textColor="@color/headerBg"
-            android:paddingTop="8dp"
-            android:paddingBottom="4dp" />
-
-        <ListView
-            android:id="@+id/listChannels"
-            android:layout_width="match_parent"
-            android:layout_height="290dp"
-            android:background="@color/panelBg2"
-            android:divider="#FFBBDEFB"
-            android:dividerHeight="1dp" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="通讯日志"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:textColor="@color/headerBg"
-            android:paddingTop="8dp"
-            android:paddingBottom="4dp" />
-
-        <ScrollView
-            android:id="@+id/scrollLog"
-            android:layout_width="match_parent"
-            android:layout_height="110dp"
-            android:background="@color/logBg">
-            <TextView
-                android:id="@+id/tvLog"
+            android:orientation="vertical"
+            android:layout_marginTop="12dp">
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textSize="11sp"
-                android:fontFamily="monospace"
-                android:textColor="@color/logText"
-                android:padding="6dp" />
-        </ScrollView>
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="运行日志"
+                    android:textSize="11sp"
+                    android:textColor="#FF7A93B8"
+                    android:letterSpacing="0.1" />
+                <Button
+                    android:id="@+id/btnClearLog"
+                    android:layout_width="wrap_content"
+                    android:layout_height="28dp"
+                    android:text="清空"
+                    android:textSize="10sp"
+                    android:textColor="#FF7A93B8"
+                    android:background="@drawable/btn_ghost"
+                    android:minWidth="0dp"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp" />
+            </LinearLayout>
+            <ScrollView
+                android:id="@+id/scrollLog"
+                android:layout_width="match_parent"
+                android:layout_height="100dp"
+                android:background="@drawable/bg_log"
+                android:layout_marginTop="4dp"
+                android:scrollbars="none">
+                <TextView
+                    android:id="@+id/tvLog"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="10sp"
+                    android:fontFamily="monospace"
+                    android:textColor="#FF8FD8FF"
+                    android:padding="8dp" />
+            </ScrollView>
+        </LinearLayout>
     </LinearLayout>
 </LinearLayout>
 </ScrollView>

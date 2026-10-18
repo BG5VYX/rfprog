@@ -13,14 +13,12 @@ import android.hardware.usb.UsbManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
-import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.Spinner;
@@ -31,6 +29,9 @@ import com.hoho.android.usbserial.driver.UsbSerialDriver;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
 import com.hoho.android.usbserial.driver.UsbSerialProber;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -39,43 +40,49 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * 写频助手主界面：支持 KT-10R 与 UV-K5 双机型，
- * 频道数据以统一模型保存，切换机型后可直接写入另一台机器。
+ * 写频助手 v3：卡片式频道编辑 + 频率表导入导出 + EEPROM/校准备份还原
  */
 public class MainActivity extends Activity {
 
     private static final String ACTION_USB_PERMISSION = "com.qytong.rfprog.USB_PERMISSION";
+    private static final int REQ_SAVE_IMAGE = 2;
+    private static final int REQ_OPEN_IMAGE = 3;
+    private static final int REQ_EXPORT_CSV = 4;
+    private static final int REQ_IMPORT_CSV = 5;
+    private static final int REQ_BACKUP = 6;
+    private static final int REQ_RESTORE = 7;
 
     private UsbManager usbManager;
     private UsbSerialPort serialPort;
     private Kt10rLink ktLink;
     private Uvk5Radio k5Radio;
 
-    private Spinner spinnerMachine, spinnerDevices;
-    private Button btnConnect, btnRead, btnWrite, btnSave, btnOpen, btnHex;
-    private TextView tvStatus, tvLog, tvUvk5Info;
-    private View panelUvk5;
+    private Spinner spinnerMachine, spinnerDevices, spQt1, spQt2, spBand, spPower, spMod;
+    private Button btnConnect, btnRead, btnWrite, btnTools, btnPrev, btnNext, btnSaveCh, btnClearLog;
+    private TextView tvStatus, tvLog, tvMachineInfo, tvChannelNo, tvTotal;
+    private CheckBox cbScramble;
+    private View panelK5Only;
     private ProgressBar progress;
-    private ListView listChannels;
     private ScrollView scrollLog;
+    private EditText etRx, etTx, etName;
 
     private final List<UsbSerialDriver> drivers = new ArrayList<UsbSerialDriver>();
-    private ArrayAdapter<String> deviceLabels;
-    private ArrayAdapter<String> machineLabels;
+    private ArrayAdapter<String> deviceLabels, machineLabels, toneAdapter;
+    private List<Tone> toneOptions = Tone.allOptions();
 
     private RadioType machine = RadioType.KT10R;
     private List<UnifiedChannel> channels = new ArrayList<UnifiedChannel>();
+    private int currentIndex = 0;
 
-    /** 各机型最近一次读到的原始镜像 */
     private byte[] imageKt = new byte[EepromImage.SIZE];
     private byte[] imageK5 = new byte[Uvk5Radio.EEPROM_SIZE];
     private boolean ktLoaded = false;
     private boolean k5Loaded = false;
 
-    private ChannelAdapter channelAdapter;
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final Handler ui = new Handler(Looper.getMainLooper());
     private String radioInfo = "";
+    private int pendingBackupRange = 0;   // 0=全量 1=校准
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -88,30 +95,40 @@ public class MainActivity extends Activity {
     }
 
     private void onCreateInner(Bundle savedInstanceState) {
-        android.util.Log.i("rfprog", "onCreate start, sdk=" + android.os.Build.VERSION.SDK_INT);
         setContentView(R.layout.activity_main);
         usbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
 
         spinnerMachine = (Spinner) findViewById(R.id.spinnerMachine);
         spinnerDevices = (Spinner) findViewById(R.id.spinnerDevices);
+        spQt1 = (Spinner) findViewById(R.id.spQt1);
+        spQt2 = (Spinner) findViewById(R.id.spQt2);
+        spBand = (Spinner) findViewById(R.id.spBand);
+        spPower = (Spinner) findViewById(R.id.spPower);
+        spMod = (Spinner) findViewById(R.id.spMod);
         btnConnect = (Button) findViewById(R.id.btnConnect);
         btnRead = (Button) findViewById(R.id.btnRead);
         btnWrite = (Button) findViewById(R.id.btnWrite);
-        btnSave = (Button) findViewById(R.id.btnSave);
-        btnOpen = (Button) findViewById(R.id.btnOpen);
-        btnHex = (Button) findViewById(R.id.btnHex);
+        btnTools = (Button) findViewById(R.id.btnTools);
+        btnPrev = (Button) findViewById(R.id.btnPrev);
+        btnNext = (Button) findViewById(R.id.btnNext);
+        btnSaveCh = (Button) findViewById(R.id.btnSaveCh);
+        btnClearLog = (Button) findViewById(R.id.btnClearLog);
         tvStatus = (TextView) findViewById(R.id.tvStatus);
         tvLog = (TextView) findViewById(R.id.tvLog);
-        tvUvk5Info = (TextView) findViewById(R.id.tvUvk5Info);
-        panelUvk5 = findViewById(R.id.panelUvk5);
+        tvMachineInfo = (TextView) findViewById(R.id.tvMachineInfo);
+        tvChannelNo = (TextView) findViewById(R.id.tvChannelNo);
+        tvTotal = (TextView) findViewById(R.id.tvTotal);
+        cbScramble = (CheckBox) findViewById(R.id.cbScramble);
+        panelK5Only = findViewById(R.id.panelK5Only);
         progress = (ProgressBar) findViewById(R.id.progress);
-        listChannels = (ListView) findViewById(R.id.listChannels);
         scrollLog = (ScrollView) findViewById(R.id.scrollLog);
+        etRx = (EditText) findViewById(R.id.etRx);
+        etTx = (EditText) findViewById(R.id.etTx);
+        etName = (EditText) findViewById(R.id.etName);
 
         machineLabels = new ArrayAdapter<String>(this,
                 android.R.layout.simple_spinner_dropdown_item, RadioType.labels());
         spinnerMachine.setAdapter(machineLabels);
-
         SharedPreferences sp = getSharedPreferences("rfprog", MODE_PRIVATE);
         machine = RadioType.fromIndex(sp.getInt("machine", 0));
         spinnerMachine.setSelection(machine.ordinal());
@@ -120,10 +137,22 @@ public class MainActivity extends Activity {
                 android.R.layout.simple_spinner_dropdown_item, new ArrayList<String>());
         spinnerDevices.setAdapter(deviceLabels);
 
-        channelAdapter = new ChannelAdapter(channels, machine);
-        listChannels.setAdapter(channelAdapter);
+        toneAdapter = new ArrayAdapter<String>(this,
+                android.R.layout.simple_spinner_dropdown_item, toneLabels());
+        spQt1.setAdapter(toneAdapter);
+        spQt2.setAdapter(toneAdapter);
 
-        spinnerMachine.setOnItemSelectedListener(new MachineSelected(this));
+        spBand.setAdapter(new ArrayAdapter<String>(this,
+                android.R.layout.simple_spinner_dropdown_item,
+                new String[]{"宽带 Wide", "窄带 Narrow"}));
+
+        spPower.setAdapter(new ArrayAdapter<String>(this,
+                android.R.layout.simple_spinner_dropdown_item,
+                new String[]{"低功率", "中功率", "高功率"}));
+
+        spMod.setAdapter(new ArrayAdapter<String>(this,
+                android.R.layout.simple_spinner_dropdown_item,
+                new String[]{"FM", "AM", "USB", "LSB"}));
 
         IntentFilter filter = new IntentFilter();
         filter.addAction(ACTION_USB_PERMISSION);
@@ -135,18 +164,26 @@ public class MainActivity extends Activity {
             registerReceiver(new UsbReceiver(this), filter);
         }
 
-        btnConnect.setOnClickListener(new ConnectClick(this));
-        btnRead.setOnClickListener(new ActionClick(this, 0));
-        btnWrite.setOnClickListener(new ActionClick(this, 1));
-        btnSave.setOnClickListener(new ActionClick(this, 2));
-        btnOpen.setOnClickListener(new ActionClick(this, 3));
-        btnHex.setOnClickListener(new ActionClick(this, 4));
-        listChannels.setOnItemClickListener(new ItemClick(this));
+        spinnerMachine.setOnItemSelectedListener(new MachineSelected(this));
+        btnConnect.setOnClickListener(new Click(this, 0));
+        btnRead.setOnClickListener(new Click(this, 1));
+        btnWrite.setOnClickListener(new Click(this, 2));
+        btnTools.setOnClickListener(new Click(this, 3));
+        btnPrev.setOnClickListener(new Click(this, 4));
+        btnNext.setOnClickListener(new Click(this, 5));
+        btnSaveCh.setOnClickListener(new Click(this, 6));
+        btnClearLog.setOnClickListener(new Click(this, 7));
 
+        loadLocal();
+        if (channels.isEmpty()) {
+            initEmptyChannels();
+        }
+        currentIndex = 0;
         applyMachineUi();
         refreshDevices();
-        log("写频助手 v2.0 —— 支持 泉益通 KT-10R 与 泉盛 UV-K5");
-        log("选择机型 → 连接 OTG 串口 → 读频 → 编辑 → 写频");
+        showChannel(0);
+        log("写频助手 v3.0 —— 卡片式写频 · 双机型");
+        log("连接串口读取电台，或直接在卡片中录入频率");
     }
 
     @Override
@@ -163,31 +200,18 @@ public class MainActivity extends Activity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
-        if (requestCode == 2) saveImage(data.getData());
-        else if (requestCode == 3) openImage(data.getData());
-    }
-
-    /** 启动异常时把错误显示出来，便于定位（而不是直接闪退） */
-    private void showCrash(Throwable t) {
-        try {
-            java.io.StringWriter sw = new java.io.StringWriter();
-            t.printStackTrace(new java.io.PrintWriter(sw));
-            String msg = "启动失败：\n" + sw.toString();
-            android.util.Log.e("rfprog", msg);
-            ScrollView sv = new ScrollView(this);
-            TextView tv = new TextView(this);
-            tv.setText(msg);
-            tv.setTextSize(11);
-            tv.setTextIsSelectable(true);
-            tv.setPadding(24, 24, 24, 24);
-            sv.addView(tv);
-            setContentView(sv);
-        } catch (Throwable ignored) {
+        switch (requestCode) {
+            case REQ_SAVE_IMAGE: saveImage(data.getData()); break;
+            case REQ_OPEN_IMAGE: openImage(data.getData()); break;
+            case REQ_EXPORT_CSV: exportCsv(data.getData()); break;
+            case REQ_IMPORT_CSV: importCsv(data.getData()); break;
+            case REQ_BACKUP: writeBackup(data.getData()); break;
+            case REQ_RESTORE: readRestore(data.getData()); break;
         }
     }
 
     // ------------------------------------------------------------------
-    // 机型
+    // 机型 / UI
     // ------------------------------------------------------------------
 
     void setMachine(RadioType t) {
@@ -195,22 +219,554 @@ public class MainActivity extends Activity {
         machine = t;
         getSharedPreferences("rfprog", MODE_PRIVATE).edit().putInt("machine", t.ordinal()).apply();
         applyMachineUi();
-        channelAdapter = new ChannelAdapter(channels, machine);
-        listChannels.setAdapter(channelAdapter);
-        log("已切换机型: " + t.displayName + "（频道数据保留，可直接写入）");
+        if (serialPort != null) {
+            disconnect();
+            log("机型已切换，请重新连接（串口速率不同）");
+        }
+        showChannel(currentIndex);
     }
 
     void applyMachineUi() {
-        panelUvk5.setVisibility(machine == RadioType.UVK5 ? View.VISIBLE : View.GONE);
+        panelK5Only.setVisibility(machine == RadioType.UVK5 ? View.VISIBLE : View.GONE);
+        tvTotal.setText("/ " + (machine == RadioType.UVK5 ? Uvk5Radio.CH_COUNT : Kt10rCodec.channelCount()));
+        updateMachineInfo();
+    }
+
+    void updateMachineInfo() {
+        String s = machine.displayName + " · " + machine.baud + " 8N1 · "
+                + (serialPort != null ? "已连接" : "未连接");
+        if (radioInfo != null && radioInfo.length() > 0) s += " · " + radioInfo;
+        tvMachineInfo.setText(s);
+    }
+
+    // ------------------------------------------------------------------
+    // 频道卡片
+    // ------------------------------------------------------------------
+
+    void initEmptyChannels() {
+        channels.clear();
+        int n = machine == RadioType.UVK5 ? Uvk5Radio.CH_COUNT : Kt10rCodec.channelCount();
+        for (int i = 0; i < n; i++) {
+            UnifiedChannel c = new UnifiedChannel();
+            c.index = i;
+            channels.add(c);
+        }
+    }
+
+    void showChannel(int idx) {
+        if (channels.isEmpty()) initEmptyChannels();
+        if (idx < 0) idx = 0;
+        if (idx >= channels.size()) idx = channels.size() - 1;
+        currentIndex = idx;
+        UnifiedChannel c = channels.get(idx);
+        tvChannelNo.setText(String.format("%03d", idx + 1));
+        etRx.setText(c.rxHz > 0 ? HexUtil.freqHzToMhzText(c.rxHz) : "");
+        etTx.setText(c.txHz > 0 ? HexUtil.freqHzToMhzText(c.txHz) : "");
+        etName.setText(c.name == null ? "" : c.name);
+        spQt1.setSelection(indexOfTone(c.rxTone));
+        spQt2.setSelection(indexOfTone(c.txTone));
+        spBand.setSelection(c.narrow ? 1 : 0);
+        spPower.setSelection(Math.max(0, Math.min(2, c.power)));
+        spMod.setSelection(Math.max(0, Math.min(3, c.modulation)));
+        cbScramble.setChecked(c.scramble);
+        tvStatus.setText("正在编辑 信道 " + (idx + 1) + (c.isEmpty() ? "（空）" : " · " + c.summary()));
+    }
+
+    /** 读取卡片内容写回当前频道 */
+    void readCard() {
+        UnifiedChannel c = channels.get(currentIndex);
+        long rx = HexUtil.parseMhz(etRx.getText().toString());
+        long tx = HexUtil.parseMhz(etTx.getText().toString());
+        if (rx <= 0 && tx <= 0) {
+            c.rxHz = 0;
+            c.txHz = 0;
+        } else {
+            c.rxHz = rx > 0 ? rx : tx;
+            c.txHz = tx > 0 ? tx : c.rxHz;
+        }
+        c.rxTone = toneOptions.get(Math.max(0, Math.min(toneOptions.size() - 1, spQt1.getSelectedItemPosition())));
+        c.txTone = toneOptions.get(Math.max(0, Math.min(toneOptions.size() - 1, spQt2.getSelectedItemPosition())));
+        c.narrow = spBand.getSelectedItemPosition() == 1;
+        c.power = spPower.getSelectedItemPosition();
+        c.modulation = spMod.getSelectedItemPosition();
+        c.scramble = cbScramble.isChecked();
+        c.name = etName.getText().toString().trim();
+        c.index = currentIndex;
+    }
+
+    void saveChannelLocal() {
+        readCard();
+        saveLocal();
+        UnifiedChannel c = channels.get(currentIndex);
+        tvStatus.setText("已保存 信道 " + (currentIndex + 1) + (c.isEmpty() ? "（空）" : " · " + c.summary()));
+        log("信道 " + (currentIndex + 1) + " 已保存到本地");
+        Toast.makeText(this, "已保存到本地", Toast.LENGTH_SHORT).show();
+    }
+
+    void nextChannel() {
+        readCard();
+        saveLocal();
+        showChannel(currentIndex + 1);
+    }
+
+    void prevChannel() {
+        readCard();
+        saveLocal();
+        showChannel(currentIndex - 1);
+    }
+
+    private List<String> toneLabels() {
+        List<String> labels = new ArrayList<String>();
+        for (Tone t : toneOptions) labels.add(t.label());
+        return labels;
+    }
+
+    private int indexOfTone(Tone t) {
+        if (t == null) return 0;
+        for (int i = 0; i < toneOptions.size(); i++) {
+            if (toneOptions.get(i).sameAs(t)) return i;
+        }
+        return 0;
+    }
+
+    // ------------------------------------------------------------------
+    // 本地存储
+    // ------------------------------------------------------------------
+
+    private java.io.File localFile() {
+        return new java.io.File(getFilesDir(), "channels.json");
+    }
+
+    void saveLocal() {
+        try {
+            JSONArray arr = new JSONArray();
+            for (UnifiedChannel c : channels) {
+                if (c.isEmpty() && (c.name == null || c.name.length() == 0)
+                        && c.rxTone.type == Tone.OFF && c.txTone.type == Tone.OFF) continue;
+                JSONObject o = new JSONObject();
+                o.put("i", c.index);
+                o.put("rx", c.rxHz);
+                o.put("tx", c.txHz);
+                o.put("rt", toneToText(c.rxTone));
+                o.put("tt", toneToText(c.txTone));
+                o.put("nw", c.narrow);
+                o.put("pw", c.power);
+                o.put("nm", c.name == null ? "" : c.name);
+                o.put("md", c.modulation);
+                o.put("sc", c.scramble);
+                arr.put(o);
+            }
+            JSONObject root = new JSONObject();
+            root.put("version", 3);
+            root.put("machine", machine.name());
+            root.put("channels", arr);
+            OutputStream os = new java.io.FileOutputStream(localFile());
+            os.write(root.toString().getBytes("UTF-8"));
+            os.close();
+        } catch (Exception e) {
+            log("本地保存失败: " + e.getMessage());
+        }
+    }
+
+    void loadLocal() {
+        try {
+            java.io.File f = localFile();
+            if (!f.exists()) return;
+            byte[] buf = new byte[(int) f.length()];
+            InputStream is = new java.io.FileInputStream(f);
+            int n = is.read(buf);
+            is.close();
+            JSONObject root = new JSONObject(new String(buf, 0, n, "UTF-8"));
+            JSONArray arr = root.optJSONArray("channels");
+            if (arr == null) return;
+            initEmptyChannels();
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.getJSONObject(i);
+                int idx = o.optInt("i", i);
+                if (idx < 0 || idx >= channels.size()) continue;
+                UnifiedChannel c = channels.get(idx);
+                c.rxHz = o.optLong("rx", 0);
+                c.txHz = o.optLong("tx", 0);
+                c.rxTone = toneFromText(o.optString("rt", "OFF"));
+                c.txTone = toneFromText(o.optString("tt", "OFF"));
+                c.narrow = o.optBoolean("nw", false);
+                c.power = o.optInt("pw", 1);
+                c.name = o.optString("nm", "");
+                c.modulation = o.optInt("md", 0);
+                c.scramble = o.optBoolean("sc", false);
+            }
+            log("已载入本地频率表");
+        } catch (Exception e) {
+            log("本地载入失败: " + e.getMessage());
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // 频率表 CSV
+    // ------------------------------------------------------------------
+
+    void startExportCsv() {
+        readCard();
+        Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.setType("text/csv");
+        i.putExtra(Intent.EXTRA_TITLE, "channels.csv");
+        startActivityForResult(i, REQ_EXPORT_CSV);
+    }
+
+    void startImportCsv() {
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.setType("*/*");
+        startActivityForResult(i, REQ_IMPORT_CSV);
+    }
+
+    void exportCsv(android.net.Uri uri) {
+        try {
+            StringBuilder sb = new StringBuilder();
+            sb.append("ch,rx,tx,rx_tone,tx_tone,bandwidth,power,name,modulation,scramble\n");
+            for (UnifiedChannel c : channels) {
+                if (c.isEmpty()) continue;
+                sb.append(c.index + 1).append(',')
+                        .append(c.rxHz > 0 ? HexUtil.freqHzToMhzText(c.rxHz) : "").append(',')
+                        .append(c.txHz > 0 ? HexUtil.freqHzToMhzText(c.txHz) : "").append(',')
+                        .append(toneToText(c.rxTone)).append(',')
+                        .append(toneToText(c.txTone)).append(',')
+                        .append(c.narrow ? "narrow" : "wide").append(',')
+                        .append(c.power == 0 ? "low" : (c.power == 2 ? "high" : "mid")).append(',')
+                        .append(c.name == null ? "" : c.name.replace(",", " ")).append(',')
+                        .append(c.modulation == 1 ? "AM" : (c.modulation == 2 ? "USB" : (c.modulation == 3 ? "LSB" : "FM"))).append(',')
+                        .append(c.scramble ? 1 : 0).append('\n');
+            }
+            OutputStream os = getContentResolver().openOutputStream(uri);
+            os.write(sb.toString().getBytes("UTF-8"));
+            os.flush();
+            os.close();
+            Toast.makeText(this, "频率表已导出", Toast.LENGTH_SHORT).show();
+            log("频率表已导出");
+        } catch (Exception e) {
+            Toast.makeText(this, "导出失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    void importCsv(android.net.Uri uri) {
+        try {
+            InputStream is = getContentResolver().openInputStream(uri);
+            java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(is, "UTF-8"));
+            String line;
+            int count = 0;
+            boolean first = true;
+            while ((line = br.readLine()) != null) {
+                line = line.trim();
+                if (line.length() == 0 || line.startsWith("#")) continue;
+                if (first && line.toLowerCase().startsWith("ch,")) { first = false; continue; }
+                first = false;
+                String[] p = line.split(",", -1);
+                if (p.length < 2) continue;
+                int idx;
+                try {
+                    idx = Integer.parseInt(p[0].trim()) - 1;
+                } catch (Exception e) {
+                    continue;
+                }
+                if (idx < 0 || idx >= channels.size()) continue;
+                UnifiedChannel c = channels.get(idx);
+                c.index = idx;
+                if (p.length > 1 && p[1].trim().length() > 0) {
+                    long v = HexUtil.parseMhz(p[1]);
+                    if (v > 0) c.rxHz = v;
+                }
+                if (p.length > 2 && p[2].trim().length() > 0) {
+                    long v = HexUtil.parseMhz(p[2]);
+                    if (v > 0) c.txHz = v;
+                } else if (c.txHz <= 0) {
+                    c.txHz = c.rxHz;
+                }
+                if (p.length > 3) c.rxTone = toneFromText(p[3].trim());
+                if (p.length > 4) c.txTone = toneFromText(p[4].trim());
+                if (p.length > 5) c.narrow = p[5].trim().toLowerCase().startsWith("n");
+                if (p.length > 6) {
+                    String pw = p[6].trim().toLowerCase();
+                    c.power = pw.startsWith("l") ? 0 : (pw.startsWith("h") ? 2 : 1);
+                }
+                if (p.length > 7) c.name = p[7].trim();
+                if (p.length > 8) {
+                    String md = p[8].trim().toUpperCase();
+                    c.modulation = md.equals("AM") ? 1 : (md.equals("USB") ? 2 : (md.equals("LSB") ? 3 : 0));
+                }
+                if (p.length > 9) c.scramble = p[9].trim().equals("1");
+                count++;
+            }
+            br.close();
+            saveLocal();
+            showChannel(currentIndex);
+            Toast.makeText(this, "已导入 " + count + " 个信道", Toast.LENGTH_SHORT).show();
+            log("频率表导入完成，共 " + count + " 个信道");
+        } catch (Exception e) {
+            Toast.makeText(this, "导入失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    static String toneToText(Tone t) {
+        if (t == null || t.type == Tone.OFF) return "OFF";
+        if (t.type == Tone.CTCSS) return String.format("%.1f", t.hz);
+        return "D" + String.format("%03d", t.dcsCode) + (t.inverted ? "I" : "");
+    }
+
+    static Tone toneFromText(String s) {
+        if (s == null) return Tone.off();
+        s = s.trim();
+        if (s.length() == 0 || s.equalsIgnoreCase("OFF") || s.equals("0")) return Tone.off();
+        if (s.toUpperCase().startsWith("D")) {
+            boolean inv = s.toUpperCase().endsWith("I");
+            String num = s.substring(1);
+            if (inv) num = num.substring(0, num.length() - 1);
+            try {
+                return Tone.dcs(Integer.parseInt(num), inv);
+            } catch (Exception e) {
+                return Tone.off();
+            }
+        }
+        try {
+            return Tone.ctcss(Double.parseDouble(s));
+        } catch (Exception e) {
+            return Tone.off();
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // 备份 / 还原
+    // ------------------------------------------------------------------
+
+    void startBackup(int range) {
+        pendingBackupRange = range;
+        Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.setType("application/octet-stream");
+        String name = machine == RadioType.KT10R ? "kt10r_full.bin"
+                : (range == 1 ? "uvk5_calibration.bin" : "uvk5_eeprom.bin");
+        i.putExtra(Intent.EXTRA_TITLE, name);
+        startActivityForResult(i, REQ_BACKUP);
+    }
+
+    void startRestore(int range) {
+        pendingBackupRange = range;
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.setType("*/*");
+        startActivityForResult(i, REQ_RESTORE);
+    }
+
+    void writeBackup(android.net.Uri uri) {
+        try {
+            if (serialPort == null) {
+                Toast.makeText(this, "请先连接电台", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (machine == RadioType.KT10R) {
+                byte[] img = imageKt;
+                if (!ktLoaded) {
+                    ktLink.handshake();
+                    EepromImage e = new EepromImage();
+                    ktLink.readAll(e, "");
+                    img = e.data;
+                    imageKt = img;
+                    ktLoaded = true;
+                }
+                OutputStream os = getContentResolver().openOutputStream(uri);
+                os.write(img);
+                os.close();
+                log("KT-10R 全量备份完成 (" + img.length + " 字节)");
+            } else {
+                byte[] img = k5Radio.readAll();
+                imageK5 = img;
+                k5Loaded = true;
+                byte[] out;
+                if (pendingBackupRange == 1) {
+                    out = new byte[0x200];
+                    System.arraycopy(img, 0x1E00, out, 0, 0x200);
+                    log("UV-K5 校准备份完成 (0x1E00-0x2000)");
+                } else {
+                    out = img;
+                    log("UV-K5 EEPROM 备份完成 (" + img.length + " 字节)");
+                }
+                OutputStream os = getContentResolver().openOutputStream(uri);
+                os.write(out);
+                os.close();
+            }
+            Toast.makeText(this, "备份已保存", Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            Toast.makeText(this, "备份失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            log("备份失败: " + e.getMessage());
+        }
+    }
+
+    void readRestore(android.net.Uri uri) {
+        try {
+            if (serialPort == null) {
+                Toast.makeText(this, "请先连接电台", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            InputStream is = getContentResolver().openInputStream(uri);
+            java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[4096];
+            int n;
+            while ((n = is.read(buf)) > 0) bos.write(buf, 0, n);
+            is.close();
+            byte[] data = bos.toByteArray();
+
+            if (machine == RadioType.KT10R) {
+                if (data.length != EepromImage.SIZE) {
+                    Toast.makeText(this, "文件大小不符（应为 " + EepromImage.SIZE + " 字节）", Toast.LENGTH_LONG).show();
+                    return;
+                }
+                ktLink.handshake();
+                ktLink.writeAll(EepromImage.from(data));
+                imageKt = data;
+                ktLoaded = true;
+                log("KT-10R 全量还原完成");
+            } else {
+                if (pendingBackupRange == 1) {
+                    if (data.length != 0x200) {
+                        Toast.makeText(this, "校准文件应为 512 字节", Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    k5Radio.init();
+                    k5Radio.writeEeprom(0x1E00, data, 0x200);
+                    log("UV-K5 校准已还原");
+                } else {
+                    if (data.length > Uvk5Radio.EEPROM_SIZE) {
+                        Toast.makeText(this, "文件过大", Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    byte[] img = new byte[Uvk5Radio.EEPROM_SIZE];
+                    System.arraycopy(data, 0, img, 0, data.length);
+                    k5Radio.init();
+                    k5Radio.writeAll(img);
+                    k5Radio.reboot();
+                    imageK5 = img;
+                    k5Loaded = true;
+                    log("UV-K5 EEPROM 还原完成");
+                }
+            }
+            Toast.makeText(this, "还原完成，建议重新读取", Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            Toast.makeText(this, "还原失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            log("还原失败: " + e.getMessage());
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // 工具菜单
+    // ------------------------------------------------------------------
+
+    void showTools() {
+        final String[] items;
         if (machine == RadioType.UVK5) {
-            tvUvk5Info.setText("UV-K5 特性：18-1300MHz 宽频接收 · FM/AM/USB/LSB 调制 · 扰频 · 200 频道 · 10 字符信道名 · 38400 波特率");
+            items = new String[]{
+                    "导入频率表 (CSV)", "导出频率表 (CSV)",
+                    "备份 EEPROM", "还原 EEPROM",
+                    "备份校准数据", "还原校准数据",
+                    "保存镜像文件", "打开镜像文件",
+                    "查看原始数据 (HEX)"};
+        } else {
+            items = new String[]{
+                    "导入频率表 (CSV)", "导出频率表 (CSV)",
+                    "备份 EEPROM (全量)", "还原 EEPROM (全量)",
+                    "保存镜像文件", "打开镜像文件",
+                    "查看原始数据 (HEX)"};
         }
-        if (serialPort != null) {
-            // 换机型需要重新连接（波特率不同）
-            disconnect();
-            log("机型已变更，请重新连接（串口速率不同）");
+        new AlertDialog.Builder(this)
+                .setTitle("工具 · " + machine.displayName)
+                .setItems(items, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        if (machine == RadioType.UVK5) {
+                            switch (which) {
+                                case 0: startImportCsv(); break;
+                                case 1: startExportCsv(); break;
+                                case 2: startBackup(0); break;
+                                case 3: startRestore(0); break;
+                                case 4: startBackup(1); break;
+                                case 5: startRestore(1); break;
+                                case 6: startSave(); break;
+                                case 7: startOpen(); break;
+                                case 8: openHex(); break;
+                            }
+                        } else {
+                            switch (which) {
+                                case 0: startImportCsv(); break;
+                                case 1: startExportCsv(); break;
+                                case 2: startBackup(0); break;
+                                case 3: startRestore(0); break;
+                                case 4: startSave(); break;
+                                case 5: startOpen(); break;
+                                case 6: openHex(); break;
+                            }
+                        }
+                    }
+                })
+                .show();
+    }
+
+    void openHex() {
+        HexViewActivity.image = getImage();
+        HexViewActivity.title = machine.displayName + " 原始数据";
+        startActivity(new Intent(this, HexViewActivity.class));
+    }
+
+    void startSave() {
+        Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.setType("application/octet-stream");
+        i.putExtra(Intent.EXTRA_TITLE, (machine == RadioType.KT10R ? "kt10r" : "uvk5") + "_image.bin");
+        startActivityForResult(i, REQ_SAVE_IMAGE);
+    }
+
+    void startOpen() {
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.setType("*/*");
+        startActivityForResult(i, REQ_OPEN_IMAGE);
+    }
+
+    void saveImage(android.net.Uri uri) {
+        try {
+            byte[] img = getImage();
+            OutputStream os = getContentResolver().openOutputStream(uri);
+            os.write(img);
+            os.flush();
+            os.close();
+            Toast.makeText(this, "镜像已保存", Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            Toast.makeText(this, "保存失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
-        tvStatus.setText("机型: " + machine.displayName + " · 未连接");
+    }
+
+    void openImage(android.net.Uri uri) {
+        try {
+            InputStream is = getContentResolver().openInputStream(uri);
+            int size = machine == RadioType.KT10R ? EepromImage.SIZE : Uvk5Radio.EEPROM_SIZE;
+            byte[] buf = new byte[size];
+            int n = is.read(buf);
+            is.close();
+            if (machine == RadioType.KT10R) {
+                imageKt = buf;
+                ktLoaded = true;
+            } else {
+                imageK5 = buf;
+                k5Loaded = true;
+            }
+            List<UnifiedChannel> list = machine == RadioType.KT10R
+                    ? Kt10rCodec.parseChannels(buf)
+                    : Uvk5Radio.parseChannels(buf);
+            channels = new ArrayList<UnifiedChannel>(list);
+            saveLocal();
+            showChannel(0);
+            log("镜像已加载: " + n + " 字节");
+        } catch (Exception e) {
+            Toast.makeText(this, "打开失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
     }
 
     // ------------------------------------------------------------------
@@ -224,7 +780,7 @@ public class MainActivity extends Activity {
             UsbSerialDriver drv = UsbSerialProber.getDefaultProber().probeDevice(dev);
             if (drv != null) {
                 drivers.add(drv);
-                labels.add(String.format("%04X:%04X  %s", dev.getVendorId(), dev.getProductId(), dev.getDeviceName()));
+                labels.add(String.format("%04X:%04X %s", dev.getVendorId(), dev.getProductId(), dev.getDeviceName()));
             }
         }
         deviceLabels.clear();
@@ -235,7 +791,7 @@ public class MainActivity extends Activity {
 
     void requestOpen() {
         if (drivers.isEmpty()) {
-            Toast.makeText(this, "未发现USB串口设备，请检查OTG连接", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "未发现USB串口，请检查OTG", Toast.LENGTH_LONG).show();
             refreshDevices();
             return;
         }
@@ -245,10 +801,10 @@ public class MainActivity extends Activity {
         if (usbManager.hasPermission(drv.getDevice())) {
             openSelected();
         } else {
-            int piFlags = android.os.Build.VERSION.SDK_INT >= 23
+            int flags = android.os.Build.VERSION.SDK_INT >= 23
                     ? android.app.PendingIntent.FLAG_IMMUTABLE : 0;
             android.app.PendingIntent pi = android.app.PendingIntent.getBroadcast(
-                    this, 0, new Intent(ACTION_USB_PERMISSION), piFlags);
+                    this, 0, new Intent(ACTION_USB_PERMISSION), flags);
             usbManager.requestPermission(drv.getDevice(), pi);
         }
     }
@@ -269,12 +825,12 @@ public class MainActivity extends Activity {
                 k5Radio = new Uvk5Radio(port, new K5Listener(this));
                 ktLink = null;
             }
-            btnConnect.setText(R.string.disconnect);
-            tvStatus.setText("已连接 " + machine.displayName + " · " + machine.baud + " 8N1");
+            btnConnect.setText("断开");
+            updateMachineInfo();
             log("串口已打开: " + machine.baud + " 8N1");
         } catch (Exception e) {
             log("打开串口失败: " + e.getMessage());
-            Toast.makeText(this, "打开串口失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "打开失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
     }
 
@@ -286,29 +842,13 @@ public class MainActivity extends Activity {
         serialPort = null;
         ktLink = null;
         k5Radio = null;
-        btnConnect.setText(R.string.connect);
-        tvStatus.setText("机型: " + machine.displayName + " · 未连接");
+        btnConnect.setText("连接");
+        updateMachineInfo();
         log("串口已关闭");
     }
 
-    UsbSerialPort getSerialPort() {
-        return serialPort;
-    }
-
-    Kt10rLink getKtLink() {
-        return ktLink;
-    }
-
-    Uvk5Radio getK5Radio() {
-        return k5Radio;
-    }
-
-    RadioType getMachine() {
-        return machine;
-    }
-
     // ------------------------------------------------------------------
-    // 读 / 写
+    // 读写
     // ------------------------------------------------------------------
 
     void startRead() {
@@ -325,15 +865,13 @@ public class MainActivity extends Activity {
             Toast.makeText(this, "请先连接串口", Toast.LENGTH_SHORT).show();
             return;
         }
-        if (channels.isEmpty()) {
-            Toast.makeText(this, "还没有频道数据，请先读频或打开镜像", Toast.LENGTH_SHORT).show();
-            return;
-        }
+        readCard();
+        saveLocal();
         new AlertDialog.Builder(this)
-                .setTitle("确认写频")
-                .setMessage("将当前 " + channels.size() + " 个频道写入 " + machine.displayName
-                        + "。\n注意：会覆盖电台原有数据，确定继续？")
-                .setPositiveButton("确定写入", new WriteConfirmClick(this))
+                .setTitle("写入电台")
+                .setMessage("将当前 " + channels.size() + " 个信道写入 " + machine.displayName
+                        + "？\n会覆盖电台原有数据。")
+                .setPositiveButton("写入", new WriteConfirmClick(this))
                 .setNegativeButton("取消", null)
                 .show();
     }
@@ -343,32 +881,10 @@ public class MainActivity extends Activity {
         io.execute(new WriteTask(this));
     }
 
-    void setChannels(List<UnifiedChannel> list) {
-        channels.clear();
-        channels.addAll(list);
-        channelAdapter = new ChannelAdapter(channels, machine);
-        listChannels.setAdapter(channelAdapter);
-    }
-
-    List<UnifiedChannel> getChannels() {
-        return channels;
-    }
-
-    void applyImageStatus(String status) {
-        channelAdapter.notifyDataSetChanged();
-        tvStatus.setText(status + (radioInfo.isEmpty() ? "" : " · " + radioInfo));
-        setButtonsEnabled(true);
-    }
-
     void setButtonsEnabled(boolean en) {
         btnRead.setEnabled(en);
         btnWrite.setEnabled(en);
-        btnSave.setEnabled(en);
-        btnOpen.setEnabled(en);
-    }
-
-    void setRadioInfo(String info) {
-        this.radioInfo = info;
+        btnSaveCh.setEnabled(en);
     }
 
     byte[] getImage() {
@@ -389,6 +905,17 @@ public class MainActivity extends Activity {
         return machine == RadioType.KT10R ? ktLoaded : k5Loaded;
     }
 
+    void setChannels(List<UnifiedChannel> list) {
+        channels = new ArrayList<UnifiedChannel>(list);
+        saveLocal();
+        showChannel(0);
+    }
+
+    void setRadioInfo(String s) {
+        radioInfo = s;
+        updateMachineInfo();
+    }
+
     TextView getTvStatus() {
         return tvStatus;
     }
@@ -397,153 +924,121 @@ public class MainActivity extends Activity {
         return ui;
     }
 
-    void startSave() {
-        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("application/octet-stream");
-        intent.putExtra(Intent.EXTRA_TITLE,
-                (machine == RadioType.KT10R ? "kt10r" : "uvk5") + "_image.bin");
-        startActivityForResult(intent, 2);
-    }
-
-    void startOpen() {
-        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("*/*");
-        startActivityForResult(intent, 3);
-    }
-
-    void saveImage(android.net.Uri uri) {
-        try {
-            byte[] img = getImage();
-            OutputStream os = getContentResolver().openOutputStream(uri);
-            os.write(img);
-            os.flush();
-            os.close();
-            Toast.makeText(this, "镜像已保存", Toast.LENGTH_SHORT).show();
-            log("镜像已保存: " + img.length + " 字节");
-        } catch (Exception e) {
-            Toast.makeText(this, "保存失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
-        }
-    }
-
-    void openImage(android.net.Uri uri) {
-        try {
-            InputStream is = getContentResolver().openInputStream(uri);
-            int size = machine == RadioType.KT10R ? EepromImage.SIZE : Uvk5Radio.EEPROM_SIZE;
-            byte[] buf = new byte[size];
-            int n = is.read(buf);
-            is.close();
-            setImage(buf);
-            List<UnifiedChannel> list = machine == RadioType.KT10R
-                    ? Kt10rCodec.parseChannels(buf)
-                    : Uvk5Radio.parseChannels(buf);
-            setChannels(list);
-            applyImageStatus("打开镜像 " + n + " 字节");
-            log("镜像已加载: " + n + " 字节，解析 " + list.size() + " 个频道");
-        } catch (Exception e) {
-            Toast.makeText(this, "打开失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // 频道编辑
-    // ------------------------------------------------------------------
-
-    void editChannel(final int position) {
-        final UnifiedChannel ch = channels.get(position);
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        LayoutInflater inf = LayoutInflater.from(this);
-        View view = inf.inflate(R.layout.dialog_channel, null);
-
-        final EditText etRx = (EditText) view.findViewById(R.id.etRx);
-        final EditText etTx = (EditText) view.findViewById(R.id.etTx);
-        final EditText etName = (EditText) view.findViewById(R.id.etName);
-        final EditText etHex = (EditText) view.findViewById(R.id.etHex);
-        final TextView tvAddr = (TextView) view.findViewById(R.id.tvAddr);
-        final Spinner spQt1 = (Spinner) view.findViewById(R.id.spQt1);
-        final Spinner spQt2 = (Spinner) view.findViewById(R.id.spQt2);
-        final Spinner spBand = (Spinner) view.findViewById(R.id.spBand);
-        final Spinner spPower = (Spinner) view.findViewById(R.id.spPower);
-        final Spinner spMod = (Spinner) view.findViewById(R.id.spMod);
-        final CheckBox cbScramble = (CheckBox) view.findViewById(R.id.cbScramble);
-        final View panelK5 = view.findViewById(R.id.panelK5Only);
-
-        tvAddr.setText("频道 " + (position + 1) + (machine == RadioType.KT10R ? "  ·  0x" + Integer.toHexString(position * 32).toUpperCase() : "  ·  UV-K5 CH"));
-        etRx.setText(ch.rxText().equals("——") ? "" : ch.rxText());
-        etTx.setText(ch.txText().equals("——") ? "" : ch.txText());
-        etName.setText(ch.name);
-        byte[] raw = machine == RadioType.KT10R
-                ? (ch.rawKt != null ? ch.rawKt : Kt10rCodec.encode(ch))
-                : (ch.rawK5 != null ? ch.rawK5 : Uvk5Radio.encodeChannel(ch));
-        etHex.setText(HexUtil.blockToHexLines(raw));
-
-        List<Tone> tones = Tone.allOptions();
-        ArrayAdapter<String> toneAdapter = new ArrayAdapter<String>(this,
-                android.R.layout.simple_spinner_dropdown_item, toneLabels(tones));
-        spQt1.setAdapter(toneAdapter);
-        spQt2.setAdapter(toneAdapter);
-        spQt1.setSelection(indexOfTone(tones, ch.rxTone));
-        spQt2.setSelection(indexOfTone(tones, ch.txTone));
-
-        ArrayAdapter<String> bandAdapter = new ArrayAdapter<String>(this,
-                android.R.layout.simple_spinner_dropdown_item,
-                new String[]{"宽带 Wide 25K", "窄带 Narrow 12.5K"});
-        spBand.setAdapter(bandAdapter);
-        spBand.setSelection(ch.narrow ? 1 : 0);
-
-        ArrayAdapter<String> powerAdapter = new ArrayAdapter<String>(this,
-                android.R.layout.simple_spinner_dropdown_item,
-                new String[]{"低功率", "中功率", "高功率"});
-        spPower.setAdapter(powerAdapter);
-        spPower.setSelection(Math.max(0, Math.min(2, ch.power)));
-
-        ArrayAdapter<String> modAdapter = new ArrayAdapter<String>(this,
-                android.R.layout.simple_spinner_dropdown_item,
-                new String[]{"FM", "AM", "USB", "LSB"});
-        spMod.setAdapter(modAdapter);
-        spMod.setSelection(Math.max(0, Math.min(3, ch.modulation)));
-
-        cbScramble.setChecked(ch.scramble);
-        panelK5.setVisibility(machine == RadioType.UVK5 ? View.VISIBLE : View.GONE);
-
-        builder.setView(view);
-        final AlertDialog dialog = builder.create();
-        view.findViewById(R.id.btnDialogOk).setOnClickListener(
-                new DialogOkClick(this, dialog, position, tones, spQt1, spQt2, spBand,
-                        spPower, spMod, cbScramble, etRx, etTx, etName, etHex));
-        view.findViewById(R.id.btnDialogCancel).setOnClickListener(new CancelClick(dialog));
-        dialog.show();
-    }
-
-    private List<String> toneLabels(List<Tone> tones) {
-        List<String> labels = new ArrayList<String>();
-        for (Tone t : tones) labels.add(t.label());
-        return labels;
-    }
-
-    private int indexOfTone(List<Tone> tones, Tone t) {
-        for (int i = 0; i < tones.size(); i++) {
-            if (tones.get(i).sameAs(t)) return i;
-        }
-        return 0;
-    }
-
-    // ------------------------------------------------------------------
-    // 日志 / 进度
-    // ------------------------------------------------------------------
-
-    void log(final String msg) {
+    void log(String msg) {
         ui.post(new LogPost(this, msg));
     }
 
-    void showProgress(final int current, final int total, final String msg) {
+    void showProgress(int current, int total, String msg) {
         ui.post(new ProgressPost(this, current, total, msg));
     }
 
+    /** 启动异常时显示错误，便于定位 */
+    private void showCrash(Throwable t) {
+        try {
+            java.io.StringWriter sw = new java.io.StringWriter();
+            t.printStackTrace(new java.io.PrintWriter(sw));
+            String msg = "启动失败：\n" + sw.toString();
+            android.util.Log.e("rfprog", msg);
+            ScrollView sv = new ScrollView(this);
+            TextView tv = new TextView(this);
+            tv.setText(msg);
+            tv.setTextSize(11);
+            tv.setTextColor(0xFFE6F1FF);
+            tv.setTextIsSelectable(true);
+            tv.setPadding(24, 24, 24, 24);
+            sv.setBackgroundColor(0xFF070D18);
+            sv.addView(tv);
+            setContentView(sv);
+        } catch (Throwable ignored) {
+        }
+    }
+
     // ==================================================================
-    // 静态内部类
+    // 内部类
     // ==================================================================
+
+    static class MachineSelected implements AdapterView.OnItemSelectedListener {
+        private final MainActivity act;
+
+        MachineSelected(MainActivity a) {
+            act = a;
+        }
+
+        @Override
+        public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+            act.setMachine(RadioType.fromIndex(position));
+        }
+
+        @Override
+        public void onNothingSelected(AdapterView<?> parent) {
+        }
+    }
+
+    static class UsbReceiver extends BroadcastReceiver {
+        private final MainActivity act;
+
+        UsbReceiver(MainActivity a) {
+            act = a;
+        }
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (MainActivity.ACTION_USB_PERMISSION.equals(action)) {
+                synchronized (this) {
+                    if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
+                        act.log("已获得USB权限");
+                        act.openSelected();
+                    } else {
+                        act.log("USB权限被拒绝");
+                    }
+                }
+            } else if (UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(action)
+                    || UsbManager.ACTION_USB_DEVICE_DETACHED.equals(action)) {
+                act.refreshDevices();
+            }
+        }
+    }
+
+    static class Click implements View.OnClickListener {
+        private final MainActivity act;
+        private final int what;
+
+        Click(MainActivity a, int what) {
+            this.act = a;
+            this.what = what;
+        }
+
+        @Override
+        public void onClick(View v) {
+            switch (what) {
+                case 0:
+                    if (act.serialPort != null) act.disconnect();
+                    else act.requestOpen();
+                    break;
+                case 1: act.startRead(); break;
+                case 2: act.confirmWrite(); break;
+                case 3: act.showTools(); break;
+                case 4: act.prevChannel(); break;
+                case 5: act.nextChannel(); break;
+                case 6: act.saveChannelLocal(); break;
+                case 7: act.tvLog.setText(""); break;
+            }
+        }
+    }
+
+    static class WriteConfirmClick implements DialogInterface.OnClickListener {
+        private final MainActivity act;
+
+        WriteConfirmClick(MainActivity a) {
+            act = a;
+        }
+
+        @Override
+        public void onClick(DialogInterface d, int w) {
+            act.startWrite();
+        }
+    }
 
     static class LogPost implements Runnable {
         private final MainActivity act;
@@ -608,7 +1103,8 @@ public class MainActivity extends Activity {
         @Override
         public void run() {
             act.setChannels(list);
-            act.applyImageStatus(status);
+            act.tvStatus.setText(status);
+            act.setButtonsEnabled(true);
         }
     }
 
@@ -641,207 +1137,6 @@ public class MainActivity extends Activity {
             act.tvStatus.setText(msg);
             act.log(msg);
             act.setButtonsEnabled(true);
-        }
-    }
-
-    static class MachineSelected implements AdapterView.OnItemSelectedListener {
-        private final MainActivity act;
-
-        MachineSelected(MainActivity a) {
-            act = a;
-        }
-
-        @Override
-        public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-            act.setMachine(RadioType.fromIndex(position));
-        }
-
-        @Override
-        public void onNothingSelected(AdapterView<?> parent) {
-        }
-    }
-
-    static class UsbReceiver extends BroadcastReceiver {
-        private final MainActivity act;
-
-        UsbReceiver(MainActivity a) {
-            act = a;
-        }
-
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            String action = intent.getAction();
-            if (MainActivity.ACTION_USB_PERMISSION.equals(action)) {
-                synchronized (this) {
-                    if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
-                        act.log("已获得USB权限");
-                        act.openSelected();
-                    } else {
-                        act.log("USB权限被拒绝");
-                    }
-                }
-            } else if (UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(action)
-                    || UsbManager.ACTION_USB_DEVICE_DETACHED.equals(action)) {
-                act.refreshDevices();
-            }
-        }
-    }
-
-    static class ConnectClick implements View.OnClickListener {
-        private final MainActivity act;
-
-        ConnectClick(MainActivity a) {
-            act = a;
-        }
-
-        @Override
-        public void onClick(View v) {
-            if (act.getSerialPort() != null) act.disconnect();
-            else act.requestOpen();
-        }
-    }
-
-    static class ActionClick implements View.OnClickListener {
-        private final MainActivity act;
-        private final int what;
-
-        ActionClick(MainActivity a, int what) {
-            this.act = a;
-            this.what = what;
-        }
-
-        @Override
-        public void onClick(View v) {
-            switch (what) {
-                case 0: act.startRead(); break;
-                case 1: act.confirmWrite(); break;
-                case 2: act.startSave(); break;
-                case 3: act.startOpen(); break;
-                case 4:
-                    HexViewActivity.image = act.getImage();
-                    HexViewActivity.title = act.getMachine().displayName + " 原始数据";
-                    act.startActivity(new Intent(act, HexViewActivity.class));
-                    break;
-            }
-        }
-    }
-
-    static class ItemClick implements AdapterView.OnItemClickListener {
-        private final MainActivity act;
-
-        ItemClick(MainActivity a) {
-            act = a;
-        }
-
-        @Override
-        public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-            act.editChannel(position);
-        }
-    }
-
-    static class WriteConfirmClick implements DialogInterface.OnClickListener {
-        private final MainActivity act;
-
-        WriteConfirmClick(MainActivity a) {
-            act = a;
-        }
-
-        @Override
-        public void onClick(DialogInterface d, int w) {
-            act.startWrite();
-        }
-    }
-
-    static class CancelClick implements View.OnClickListener {
-        private final AlertDialog dialog;
-
-        CancelClick(AlertDialog d) {
-            dialog = d;
-        }
-
-        @Override
-        public void onClick(View v) {
-            dialog.dismiss();
-        }
-    }
-
-    static class DialogOkClick implements View.OnClickListener {
-        private final MainActivity act;
-        private final AlertDialog dialog;
-        private final int position;
-        private final List<Tone> tones;
-        private final Spinner spQt1, spQt2, spBand, spPower, spMod;
-        private final CheckBox cbScramble;
-        private final EditText etRx, etTx, etName, etHex;
-
-        DialogOkClick(MainActivity a, AlertDialog d, int pos, List<Tone> tones,
-                      Spinner qt1, Spinner qt2, Spinner band, Spinner power, Spinner mod,
-                      CheckBox scramble, EditText rx, EditText tx, EditText name, EditText hex) {
-            this.act = a;
-            this.dialog = d;
-            this.position = pos;
-            this.tones = tones;
-            this.spQt1 = qt1;
-            this.spQt2 = qt2;
-            this.spBand = band;
-            this.spPower = power;
-            this.spMod = mod;
-            this.cbScramble = scramble;
-            this.etRx = rx;
-            this.etTx = tx;
-            this.etName = name;
-            this.etHex = hex;
-        }
-
-        @Override
-        public void onClick(View v) {
-            try {
-                byte[] raw = HexUtil.hexToBytes(etHex.getText().toString());
-                if (raw.length != 32) {
-                    Toast.makeText(act, "原始数据必须是 32 字节", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                UnifiedChannel c = act.getChannels().get(position);
-
-                long rxHz = HexUtil.parseMhz(etRx.getText().toString());
-                long txHz = HexUtil.parseMhz(etTx.getText().toString());
-                c.rxHz = rxHz > 0 ? rxHz : 0;
-                c.txHz = txHz > 0 ? txHz : c.rxHz;
-                c.rxTone = pick(spQt1.getSelectedItemPosition());
-                c.txTone = pick(spQt2.getSelectedItemPosition());
-                c.narrow = spBand.getSelectedItemPosition() == 1;
-                c.power = spPower.getSelectedItemPosition();
-                c.modulation = spMod.getSelectedItemPosition();
-                c.scramble = cbScramble.isChecked();
-                c.name = etName.getText().toString().trim();
-
-                // 原始数据回写（保留用户手动修改）
-                if (act.getMachine() == RadioType.KT10R) {
-                    c.rawKt = raw;
-                    // 同步结构化字段进 raw
-                    byte[] enc = Kt10rCodec.encode(c);
-                    System.arraycopy(raw, 12, enc, 12, 4); // 保留标志区手动修改
-                    c.rawKt = enc;
-                } else {
-                    c.rawK5 = raw;
-                    byte[] enc = Uvk5Radio.encodeChannel(c);
-                    System.arraycopy(raw, 0x10, enc, 0x10, 2); // 保留步进
-                    System.arraycopy(raw, 0x15, enc, 0x15, 11); // 保留扰频及名称区手动修改
-                    c.rawK5 = enc;
-                }
-
-                act.getChannels().set(position, c);
-                act.applyImageStatus("频道已更新");
-                act.log("频道 " + (position + 1) + " 已更新");
-                dialog.dismiss();
-            } catch (Exception e) {
-                Toast.makeText(act, "数据错误: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-            }
-        }
-
-        private Tone pick(int idx) {
-            if (idx < 0 || idx >= tones.size()) return Tone.off();
-            return tones.get(idx);
         }
     }
 
@@ -891,24 +1186,23 @@ public class MainActivity extends Activity {
         @Override
         public void run() {
             try {
-                if (act.getMachine() == RadioType.KT10R) {
-                    String model = act.getKtLink().handshake();
+                if (act.machine == RadioType.KT10R) {
+                    String model = act.ktLink.handshake();
                     act.setRadioInfo("电台 " + model);
-                    act.log("KT-10R 握手成功: " + model);
                     EepromImage img = new EepromImage();
-                    int n = act.getKtLink().readAll(img, model);
+                    act.ktLink.readAll(img, model);
                     act.setImage(img.data);
-                    final List<UnifiedChannel> list = Kt10rCodec.parseChannels(img.data);
-                    act.ui.post(new ReadDonePost(act, list, "读取完成，共 " + list.size() + " 块"));
+                    List<UnifiedChannel> list = Kt10rCodec.parseChannels(img.data);
+                    act.ui.post(new ReadDonePost(act, list, "读取完成，共 " + list.size() + " 信道"));
                 } else {
-                    String ver = act.getK5Radio().init();
+                    String ver = act.k5Radio.init();
                     act.setRadioInfo("UV-K5 " + ver);
-                    byte[] img = act.getK5Radio().readAll();
+                    byte[] img = act.k5Radio.readAll();
                     act.setImage(img);
-                    final List<UnifiedChannel> list = Uvk5Radio.parseChannels(img);
-                    act.ui.post(new ReadDonePost(act, list, "读取完成，共 " + list.size() + " 频道"));
+                    List<UnifiedChannel> list = Uvk5Radio.parseChannels(img);
+                    act.ui.post(new ReadDonePost(act, list, "读取完成，共 " + list.size() + " 信道"));
                 }
-            } catch (final Exception e) {
+            } catch (Exception e) {
                 act.ui.post(new ErrorPost(act, "读频失败: " + e.getMessage()));
             }
         }
@@ -924,35 +1218,34 @@ public class MainActivity extends Activity {
         @Override
         public void run() {
             try {
-                // 若当前机型尚未读频，先读取原机数据，避免把空白镜像写入电台
                 if (!act.isImageLoaded()) {
                     act.log("当前机型尚未读取，先读取原机数据以保留设置...");
-                    if (act.getMachine() == RadioType.KT10R) {
-                        act.getKtLink().handshake();
+                    if (act.machine == RadioType.KT10R) {
+                        act.ktLink.handshake();
                         EepromImage img = new EepromImage();
-                        act.getKtLink().readAll(img, "");
+                        act.ktLink.readAll(img, "");
                         act.setImage(img.data);
                     } else {
-                        act.getK5Radio().init();
-                        act.setImage(act.getK5Radio().readAll());
+                        act.k5Radio.init();
+                        act.setImage(act.k5Radio.readAll());
                     }
                 }
-                if (act.getMachine() == RadioType.KT10R) {
+                if (act.machine == RadioType.KT10R) {
                     byte[] img = act.getImage().clone();
-                    Kt10rCodec.applyChannels(img, act.getChannels());
-                    act.getKtLink().handshake();
-                    act.getKtLink().writeAll(com.qytong.rfprog.EepromImage.from(img));
+                    Kt10rCodec.applyChannels(img, act.channels);
+                    act.ktLink.handshake();
+                    act.ktLink.writeAll(EepromImage.from(img));
                     act.setImage(img);
                 } else {
                     byte[] img = act.getImage().clone();
-                    Uvk5Radio.applyChannels(img, act.getChannels());
-                    act.getK5Radio().init();
-                    act.getK5Radio().writeAll(img);
-                    act.getK5Radio().reboot();
+                    Uvk5Radio.applyChannels(img, act.channels);
+                    act.k5Radio.init();
+                    act.k5Radio.writeAll(img);
+                    act.k5Radio.reboot();
                     act.setImage(img);
                 }
                 act.ui.post(new WriteDonePost(act));
-            } catch (final Exception e) {
+            } catch (Exception e) {
                 act.ui.post(new ErrorPost(act, "写频失败: " + e.getMessage()));
             }
         }

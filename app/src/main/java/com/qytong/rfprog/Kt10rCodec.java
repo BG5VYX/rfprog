@@ -10,6 +10,11 @@ import java.util.List;
  */
 public class Kt10rCodec {
 
+    /** 频道块数量 */
+    public static int channelCount() {
+        return EepromImage.addressSequence().length;
+    }
+
     public static UnifiedChannel decode(int idx, byte[] raw) {
         UnifiedChannel c = new UnifiedChannel();
         c.index = idx;

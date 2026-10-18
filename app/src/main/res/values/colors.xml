@@ -1,19 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="headerBg">#FF0D47A1</color>
+    <color name="bgDeep">#FF070D18</color>
+    <color name="bgCard">#FF101B2E</color>
+    <color name="bgCard2">#FF0C1626</color>
+    <color name="stroke">#FF1E3A5F</color>
+    <color name="accent">#FF00D4FF</color>
+    <color name="accent2">#FF2979FF</color>
+    <color name="textPrimary">#FFE6F1FF</color>
+    <color name="textSecondary">#FF7A93B8</color>
+    <color name="success">#FF00E676</color>
+    <color name="warn">#FFFFB300</color>
+    <color name="danger">#FFFF5252</color>
+    <color name="logBg">#FF060C16</color>
+    <color name="logText">#FF8FD8FF</color>
+    <!-- 兼容旧引用 -->
+    <color name="headerBg">#FF0B1E3A</color>
     <color name="headerBg2">#FF1565C0</color>
     <color name="btnBlue">#FF1976D2</color>
     <color name="btnBlueDark">#FF0D47A1</color>
     <color name="btnRed">#FFC62828</color>
     <color name="btnGreen">#FF2E7D32</color>
     <color name="btnGray">#FF546E7A</color>
-    <color name="panelBg">#FFE3F2FD</color>
-    <color name="panelBg2">#FFF3F8FE</color>
-    <color name="textDark">#FF0D2B45</color>
-    <color name="textLight">#FF607D8B</color>
-    <color name="rowOdd">#FFFFFFFF</color>
-    <color name="rowEven">#FFF3F8FE</color>
-    <color name="logBg">#FF0A1F33</color>
-    <color name="logText">#FF90CAF9</color>
-    <color name="accentCyan">#FF00ACC1</color>
+    <color name="panelBg">#FF13294A</color>
+    <color name="panelBg2">#FF0C1626</color>
+    <color name="textDark">#FFE6F1FF</color>
+    <color name="textLight">#FF7A93B8</color>
+    <color name="rowOdd">#FF0C1626</color>
+    <color name="rowEven">#FF101B2E</color>
+    <color name="accentCyan">#FF00D4FF</color>
 </resources>
