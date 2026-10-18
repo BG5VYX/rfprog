@@ -144,7 +144,7 @@ public class MainActivity extends Activity {
 
         spBand.setAdapter(new ArrayAdapter<String>(this,
                 android.R.layout.simple_spinner_dropdown_item,
-                new String[]{"宽带 Wide", "窄带 Narrow"}));
+                new String[]{"12.5 kHz", "25 kHz"}));
 
         spPower.setAdapter(new ArrayAdapter<String>(this,
                 android.R.layout.simple_spinner_dropdown_item,
@@ -265,7 +265,7 @@ public class MainActivity extends Activity {
         etName.setText(c.name == null ? "" : c.name);
         spQt1.setSelection(indexOfTone(c.rxTone));
         spQt2.setSelection(indexOfTone(c.txTone));
-        spBand.setSelection(c.narrow ? 1 : 0);
+        spBand.setSelection(c.narrow ? 0 : 1);
         spPower.setSelection(Math.max(0, Math.min(2, c.power)));
         spMod.setSelection(Math.max(0, Math.min(3, c.modulation)));
         cbScramble.setChecked(c.scramble);
@@ -286,7 +286,7 @@ public class MainActivity extends Activity {
         }
         c.rxTone = toneOptions.get(Math.max(0, Math.min(toneOptions.size() - 1, spQt1.getSelectedItemPosition())));
         c.txTone = toneOptions.get(Math.max(0, Math.min(toneOptions.size() - 1, spQt2.getSelectedItemPosition())));
-        c.narrow = spBand.getSelectedItemPosition() == 1;
+        c.narrow = spBand.getSelectedItemPosition() == 0;
         c.power = spPower.getSelectedItemPosition();
         c.modulation = spMod.getSelectedItemPosition();
         c.scramble = cbScramble.isChecked();
@@ -661,52 +661,25 @@ public class MainActivity extends Activity {
     // ------------------------------------------------------------------
 
     void showTools() {
-        final String[] items;
-        if (machine == RadioType.UVK5) {
-            items = new String[]{
-                    "导入频率表 (CSV)", "导出频率表 (CSV)",
-                    "备份 EEPROM", "还原 EEPROM",
-                    "备份校准数据", "还原校准数据",
-                    "保存镜像文件", "打开镜像文件",
-                    "查看原始数据 (HEX)"};
-        } else {
-            items = new String[]{
-                    "导入频率表 (CSV)", "导出频率表 (CSV)",
-                    "备份 EEPROM (全量)", "还原 EEPROM (全量)",
-                    "保存镜像文件", "打开镜像文件",
-                    "查看原始数据 (HEX)"};
-        }
-        new AlertDialog.Builder(this)
-                .setTitle("工具 · " + machine.displayName)
-                .setItems(items, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface d, int which) {
-                        if (machine == RadioType.UVK5) {
-                            switch (which) {
-                                case 0: startImportCsv(); break;
-                                case 1: startExportCsv(); break;
-                                case 2: startBackup(0); break;
-                                case 3: startRestore(0); break;
-                                case 4: startBackup(1); break;
-                                case 5: startRestore(1); break;
-                                case 6: startSave(); break;
-                                case 7: startOpen(); break;
-                                case 8: openHex(); break;
-                            }
-                        } else {
-                            switch (which) {
-                                case 0: startImportCsv(); break;
-                                case 1: startExportCsv(); break;
-                                case 2: startBackup(0); break;
-                                case 3: startRestore(0); break;
-                                case 4: startSave(); break;
-                                case 5: startOpen(); break;
-                                case 6: openHex(); break;
-                            }
-                        }
-                    }
-                })
-                .show();
+        View view = getLayoutInflater().inflate(R.layout.dialog_tools, null);
+        TextView tvM = (TextView) view.findViewById(R.id.tvToolsMachine);
+        tvM.setText(machine.displayName + " · " + (serialPort != null ? "已连接" : "未连接"));
+        boolean k5 = machine == RadioType.UVK5;
+        view.findViewById(R.id.btnBackupCal).setVisibility(k5 ? View.VISIBLE : View.GONE);
+        view.findViewById(R.id.btnRestoreCal).setVisibility(k5 ? View.VISIBLE : View.GONE);
+
+        final AlertDialog dialog = new AlertDialog.Builder(this).setView(view).create();
+        view.findViewById(R.id.btnCsvImport).setOnClickListener(new ToolClick(this, dialog, 0));
+        view.findViewById(R.id.btnCsvExport).setOnClickListener(new ToolClick(this, dialog, 1));
+        view.findViewById(R.id.btnBackupEeprom).setOnClickListener(new ToolClick(this, dialog, 2));
+        view.findViewById(R.id.btnBackupCal).setOnClickListener(new ToolClick(this, dialog, 3));
+        view.findViewById(R.id.btnRestoreEeprom).setOnClickListener(new ToolClick(this, dialog, 4));
+        view.findViewById(R.id.btnRestoreCal).setOnClickListener(new ToolClick(this, dialog, 5));
+        view.findViewById(R.id.btnSaveImg).setOnClickListener(new ToolClick(this, dialog, 6));
+        view.findViewById(R.id.btnOpenImg).setOnClickListener(new ToolClick(this, dialog, 7));
+        view.findViewById(R.id.btnHexData).setOnClickListener(new ToolClick(this, dialog, 8));
+        view.findViewById(R.id.btnCloseTools).setOnClickListener(new ToolClick(this, dialog, 9));
+        dialog.show();
     }
 
     void openHex() {
@@ -1023,6 +996,35 @@ public class MainActivity extends Activity {
                 case 5: act.nextChannel(); break;
                 case 6: act.saveChannelLocal(); break;
                 case 7: act.tvLog.setText(""); break;
+            }
+        }
+    }
+
+    static class ToolClick implements View.OnClickListener {
+        private final MainActivity act;
+        private final AlertDialog dialog;
+        private final int what;
+
+        ToolClick(MainActivity a, AlertDialog d, int what) {
+            this.act = a;
+            this.dialog = d;
+            this.what = what;
+        }
+
+        @Override
+        public void onClick(View v) {
+            dialog.dismiss();
+            switch (what) {
+                case 0: act.startImportCsv(); break;
+                case 1: act.startExportCsv(); break;
+                case 2: act.startBackup(0); break;
+                case 3: act.startBackup(1); break;
+                case 4: act.startRestore(0); break;
+                case 5: act.startRestore(1); break;
+                case 6: act.startSave(); break;
+                case 7: act.startOpen(); break;
+                case 8: act.openHex(); break;
+                case 9: break;
             }
         }
     }

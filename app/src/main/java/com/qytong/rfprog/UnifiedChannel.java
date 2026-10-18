@@ -14,7 +14,7 @@ public class UnifiedChannel {
     public Tone rxTone = Tone.off();
     public Tone txTone = Tone.off();
     public boolean narrow = false; // 窄带
-    public int power = 1;          // 0=低 1=中 2=高
+    public int power = 2;          // 0=低 1=中 2=高（默认高功率）
     public String name = "";       // 频道名（UV-K5 最多10字符）
     public int modulation = 0;     // 0=FM 1=AM 2=USB 3=LSB (UV-K5)
     public boolean scramble = false; // 扰频 (UV-K5)
