@@ -542,27 +542,23 @@ public class ProlificSerialDriver implements UsbSerialDriver {
         @Override
         public void setFlowControl(FlowControl flowControl) throws IOException {
             // vendorOut values from https://www.mail-archive.com/linux-usb@vger.kernel.org/msg110968.html
-            switch (flowControl) {
-                case NONE:
-                    if (mDeviceType == DeviceType.DEVICE_TYPE_HXN)
-                        vendorOut(0x0a, 0xff, null);
-                    else
-                        vendorOut(0, 0, null);
-                    break;
-                case RTS_CTS:
-                    if (mDeviceType == DeviceType.DEVICE_TYPE_HXN)
-                        vendorOut(0x0a, 0xfa, null);
-                    else
-                        vendorOut(0, 0x61, null);
-                    break;
-                case XON_XOFF_INLINE:
-                    if (mDeviceType == DeviceType.DEVICE_TYPE_HXN)
-                        vendorOut(0x0a, 0xee, null);
-                    else
-                        vendorOut(0, 0xc1, null);
-                    break;
-                default:
-                    throw new UnsupportedOperationException();
+            if (flowControl == FlowControl.NONE) {
+                if (mDeviceType == DeviceType.DEVICE_TYPE_HXN)
+                    vendorOut(0x0a, 0xff, null);
+                else
+                    vendorOut(0, 0, null);
+            } else if (flowControl == FlowControl.RTS_CTS) {
+                if (mDeviceType == DeviceType.DEVICE_TYPE_HXN)
+                    vendorOut(0x0a, 0xfa, null);
+                else
+                    vendorOut(0, 0x61, null);
+            } else if (flowControl == FlowControl.XON_XOFF_INLINE) {
+                if (mDeviceType == DeviceType.DEVICE_TYPE_HXN)
+                    vendorOut(0x0a, 0xee, null);
+                else
+                    vendorOut(0, 0xc1, null);
+            } else {
+                throw new UnsupportedOperationException();
             }
             mFlowControl = flowControl;
         }

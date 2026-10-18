@@ -80,6 +80,15 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        try {
+            onCreateInner(savedInstanceState);
+        } catch (Throwable t) {
+            showCrash(t);
+        }
+    }
+
+    private void onCreateInner(Bundle savedInstanceState) {
+        android.util.Log.i("rfprog", "onCreate start, sdk=" + android.os.Build.VERSION.SDK_INT);
         setContentView(R.layout.activity_main);
         usbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
 
@@ -120,7 +129,11 @@ public class MainActivity extends Activity {
         filter.addAction(ACTION_USB_PERMISSION);
         filter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
         filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
-        registerReceiver(new UsbReceiver(this), filter);
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(new UsbReceiver(this), filter, Context.RECEIVER_EXPORTED);
+        } else {
+            registerReceiver(new UsbReceiver(this), filter);
+        }
 
         btnConnect.setOnClickListener(new ConnectClick(this));
         btnRead.setOnClickListener(new ActionClick(this, 0));
@@ -152,6 +165,25 @@ public class MainActivity extends Activity {
         if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
         if (requestCode == 2) saveImage(data.getData());
         else if (requestCode == 3) openImage(data.getData());
+    }
+
+    /** 启动异常时把错误显示出来，便于定位（而不是直接闪退） */
+    private void showCrash(Throwable t) {
+        try {
+            java.io.StringWriter sw = new java.io.StringWriter();
+            t.printStackTrace(new java.io.PrintWriter(sw));
+            String msg = "启动失败：\n" + sw.toString();
+            android.util.Log.e("rfprog", msg);
+            ScrollView sv = new ScrollView(this);
+            TextView tv = new TextView(this);
+            tv.setText(msg);
+            tv.setTextSize(11);
+            tv.setTextIsSelectable(true);
+            tv.setPadding(24, 24, 24, 24);
+            sv.addView(tv);
+            setContentView(sv);
+        } catch (Throwable ignored) {
+        }
     }
 
     // ------------------------------------------------------------------
@@ -213,8 +245,10 @@ public class MainActivity extends Activity {
         if (usbManager.hasPermission(drv.getDevice())) {
             openSelected();
         } else {
+            int piFlags = android.os.Build.VERSION.SDK_INT >= 23
+                    ? android.app.PendingIntent.FLAG_IMMUTABLE : 0;
             android.app.PendingIntent pi = android.app.PendingIntent.getBroadcast(
-                    this, 0, new Intent(ACTION_USB_PERMISSION), 0);
+                    this, 0, new Intent(ACTION_USB_PERMISSION), piFlags);
             usbManager.requestPermission(drv.getDevice(), pi);
         }
     }
@@ -500,34 +534,115 @@ public class MainActivity extends Activity {
     // ------------------------------------------------------------------
 
     void log(final String msg) {
-        ui.post(new Runnable() {
-            @Override
-            public void run() {
-                tvLog.append(msg + "\n");
-                scrollLog.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        scrollLog.fullScroll(View.FOCUS_DOWN);
-                    }
-                });
-            }
-        });
+        ui.post(new LogPost(this, msg));
     }
 
     void showProgress(final int current, final int total, final String msg) {
-        ui.post(new Runnable() {
-            @Override
-            public void run() {
-                progress.setMax(total);
-                progress.setProgress(current);
-                tvStatus.setText((total > 0 ? (current * 100 / total) + "% " : "") + msg);
-            }
-        });
+        ui.post(new ProgressPost(this, current, total, msg));
     }
 
     // ==================================================================
     // 静态内部类
     // ==================================================================
+
+    static class LogPost implements Runnable {
+        private final MainActivity act;
+        private final String msg;
+
+        LogPost(MainActivity a, String m) {
+            act = a;
+            msg = m;
+        }
+
+        @Override
+        public void run() {
+            act.tvLog.append(msg + "\n");
+            act.scrollLog.post(new ScrollPost(act));
+        }
+    }
+
+    static class ScrollPost implements Runnable {
+        private final MainActivity act;
+
+        ScrollPost(MainActivity a) {
+            act = a;
+        }
+
+        @Override
+        public void run() {
+            act.scrollLog.fullScroll(View.FOCUS_DOWN);
+        }
+    }
+
+    static class ProgressPost implements Runnable {
+        private final MainActivity act;
+        private final int current, total;
+        private final String msg;
+
+        ProgressPost(MainActivity a, int c, int t, String m) {
+            act = a;
+            current = c;
+            total = t;
+            msg = m;
+        }
+
+        @Override
+        public void run() {
+            act.progress.setMax(total);
+            act.progress.setProgress(current);
+            act.tvStatus.setText((total > 0 ? (current * 100 / total) + "% " : "") + msg);
+        }
+    }
+
+    static class ReadDonePost implements Runnable {
+        private final MainActivity act;
+        private final List<UnifiedChannel> list;
+        private final String status;
+
+        ReadDonePost(MainActivity a, List<UnifiedChannel> l, String s) {
+            act = a;
+            list = l;
+            status = s;
+        }
+
+        @Override
+        public void run() {
+            act.setChannels(list);
+            act.applyImageStatus(status);
+        }
+    }
+
+    static class WriteDonePost implements Runnable {
+        private final MainActivity act;
+
+        WriteDonePost(MainActivity a) {
+            act = a;
+        }
+
+        @Override
+        public void run() {
+            act.tvStatus.setText("写入完成");
+            act.log("写频完成");
+            act.setButtonsEnabled(true);
+        }
+    }
+
+    static class ErrorPost implements Runnable {
+        private final MainActivity act;
+        private final String msg;
+
+        ErrorPost(MainActivity a, String m) {
+            act = a;
+            msg = m;
+        }
+
+        @Override
+        public void run() {
+            act.tvStatus.setText(msg);
+            act.log(msg);
+            act.setButtonsEnabled(true);
+        }
+    }
 
     static class MachineSelected implements AdapterView.OnItemSelectedListener {
         private final MainActivity act;
@@ -784,36 +899,17 @@ public class MainActivity extends Activity {
                     int n = act.getKtLink().readAll(img, model);
                     act.setImage(img.data);
                     final List<UnifiedChannel> list = Kt10rCodec.parseChannels(img.data);
-                    act.ui.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            act.setChannels(list);
-                            act.applyImageStatus("读取完成，共 " + list.size() + " 块");
-                        }
-                    });
+                    act.ui.post(new ReadDonePost(act, list, "读取完成，共 " + list.size() + " 块"));
                 } else {
                     String ver = act.getK5Radio().init();
                     act.setRadioInfo("UV-K5 " + ver);
                     byte[] img = act.getK5Radio().readAll();
                     act.setImage(img);
                     final List<UnifiedChannel> list = Uvk5Radio.parseChannels(img);
-                    act.ui.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            act.setChannels(list);
-                            act.applyImageStatus("读取完成，共 " + list.size() + " 频道");
-                        }
-                    });
+                    act.ui.post(new ReadDonePost(act, list, "读取完成，共 " + list.size() + " 频道"));
                 }
             } catch (final Exception e) {
-                act.ui.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        act.getTvStatus().setText("读频失败: " + e.getMessage());
-                        act.log("读频失败: " + e.getMessage());
-                        act.setButtonsEnabled(true);
-                    }
-                });
+                act.ui.post(new ErrorPost(act, "读频失败: " + e.getMessage()));
             }
         }
     }
@@ -855,23 +951,9 @@ public class MainActivity extends Activity {
                     act.getK5Radio().reboot();
                     act.setImage(img);
                 }
-                act.ui.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        act.getTvStatus().setText("写入完成");
-                        act.log("写频完成");
-                        act.setButtonsEnabled(true);
-                    }
-                });
+                act.ui.post(new WriteDonePost(act));
             } catch (final Exception e) {
-                act.ui.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        act.getTvStatus().setText("写频失败: " + e.getMessage());
-                        act.log("写频失败: " + e.getMessage());
-                        act.setButtonsEnabled(true);
-                    }
-                });
+                act.ui.post(new ErrorPost(act, "写频失败: " + e.getMessage()));
             }
         }
     }

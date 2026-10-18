@@ -71,6 +71,13 @@ bash build.sh
 
 ## 更新日志
 
+### v2.1
+- 修复 Android 12+ 的 PendingIntent 崩溃（增加 FLAG_IMMUTABLE）
+- 修复 Android 14 的动态广播注册崩溃（RECEIVER_EXPORTED）
+- 构建工具链改为 javac + build-tools 36（更标准、更稳定）
+- 启动异常时在界面显示错误详情，不再直接闪退
+- 移除全部匿名内部类与 enum switch 合成类
+
 ### v2.0
 - 新增 泉盛 UV-K5 / K6 支持（38400 波特率、Quansheng 协议）
 - 新增机型切换与统一频道模型（跨机型复用频率数据）

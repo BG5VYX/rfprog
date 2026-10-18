@@ -383,21 +383,17 @@ public class FtdiSerialDriver implements UsbSerialDriver {
         public void setFlowControl(FlowControl flowControl) throws IOException {
             int value = 0;
             int index = mPortNumber+1;
-            switch (flowControl) {
-                case NONE:
-                    break;
-                case RTS_CTS:
-                    index |= 0x100;
-                    break;
-                case DTR_DSR:
-                    index |= 0x200;
-                    break;
-                case XON_XOFF_INLINE:
-                    value = CHAR_XON + (CHAR_XOFF << 8);
-                    index |= 0x400;
-                    break;
-                default:
-                    throw new UnsupportedOperationException();
+            if (flowControl == FlowControl.NONE) {
+                // nothing
+            } else if (flowControl == FlowControl.RTS_CTS) {
+                index |= 0x100;
+            } else if (flowControl == FlowControl.DTR_DSR) {
+                index |= 0x200;
+            } else if (flowControl == FlowControl.XON_XOFF_INLINE) {
+                value = CHAR_XON + (CHAR_XOFF << 8);
+                index |= 0x400;
+            } else {
+                throw new UnsupportedOperationException();
             }
             int result = mConnection.controlTransfer(REQTYPE_HOST_TO_DEVICE, SET_FLOW_CONTROL_REQUEST,
                     value, index, null, 0, USB_WRITE_TIMEOUT_MILLIS);

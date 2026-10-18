@@ -14,11 +14,11 @@ KEYSTORE="$APP_HOME/debug.keystore"
 export JAVA_HOME
 PATH="$JAVA_HOME/bin:$PATH"
 
-AAPT2="$SDK/build-tools/34.0.0/aapt2.exe"
-D8="$SDK/build-tools/34.0.0/d8.bat"
-APKSIGNER="$SDK/build-tools/34.0.0/apksigner.bat"
+AAPT2="$SDK/build-tools/36.0.0/aapt2.exe"
+D8="$SDK/build-tools/36.0.0/d8.bat"
+APKSIGNER="$SDK/build-tools/36.0.0/apksigner.bat"
 ANDROID_JAR="$SDK/platforms/android-34/android.jar"
-ZIPALIGN="$SDK/build-tools/34.0.0/zipalign.exe"
+ZIPALIGN="$SDK/build-tools/36.0.0/zipalign.exe"
 
 rm -rf "$OUT"
 mkdir -p "$OUT/classes" "$OUT/dex" "$OUT/gen"
@@ -34,14 +34,13 @@ echo "==> [2/7] 链接资源+清单 (aapt2 link)"
     --java "$OUT/gen" \
     "$OUT/res.zip"
 
-echo "==> [3/7] 编译 Java (ecj)"
+echo "==> [3/7] 编译 Java (javac)"
 find "$APP_HOME/src/main/java" "$OUT/gen" -name "*.java" > "$OUT/sources.txt"
-java -jar "$APP_HOME/ecj.jar" \
-    -source 1.8 -target 1.8 \
-    -nowarn \
+javac -nowarn \
     -encoding UTF-8 \
+    -source 8 -target 8 \
     -bootclasspath "$ANDROID_JAR" \
-    -cp "$ANDROID_JAR" \
+    -classpath "$ANDROID_JAR" \
     -d "$OUT/classes" \
     @"$OUT/sources.txt"
 

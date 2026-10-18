@@ -93,6 +93,19 @@ public class HexViewActivity extends Activity {
         tvHex.setText(sb.toString());
     }
 
+    static class ResetSwitch implements Runnable {
+        private final HexViewActivity act;
+
+        ResetSwitch(HexViewActivity a) {
+            act = a;
+        }
+
+        @Override
+        public void run() {
+            act.setSwitching(false);
+        }
+    }
+
     static class GotoClick implements View.OnClickListener {
         private final HexViewActivity act;
 
@@ -131,12 +144,7 @@ public class HexViewActivity extends Activity {
                 act.setSwitching(true);
                 act.setPage(act.getPage() + 1);
                 act.render();
-                act.getScrollView().post(new Runnable() {
-                    @Override
-                    public void run() {
-                        act.setSwitching(false);
-                    }
-                });
+                act.getScrollView().post(new ResetSwitch(act));
             }
         }
     }
